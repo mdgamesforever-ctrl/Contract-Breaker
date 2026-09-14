@@ -18,11 +18,15 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Set up JDK 17
+      # Capacitor 8.5.2's own Android library (node_modules/@capacitor/android/
+      # capacitor/build.gradle) hardcodes sourceCompatibility/targetCompatibility
+      # to JavaVersion.VERSION_21, so the JDK here must be 21 -- not the app's
+      # own choice, it's a requirement of the installed Capacitor package.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
