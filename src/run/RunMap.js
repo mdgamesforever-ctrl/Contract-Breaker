@@ -33,11 +33,17 @@ export class RunMap {
 }
 
 // Generates a RunMap. `rng` is injectable for deterministic tests.
+// `enemyPool` (factory functions) is assigned randomly to fight nodes so
+// each node knows which enemy it holds; `bossFactory` is assigned to the
+// single boss node. Both are optional -- callers that don't pass them just
+// get a map without pre-assigned encounters.
 export function generateRunMap({
   floorCount = 5,
   nodesPerFloor = 3,
   restChance = 0.25,
   rng = Math.random,
+  enemyPool = [],
+  bossFactory = null,
 } = {}) {
   if (floorCount < 2) {
     throw new Error('A run map needs at least 2 floors (one fight floor and a boss floor)');
@@ -51,13 +57,17 @@ export function generateRunMap({
     const nodes = [];
     for (let i = 0; i < nodesPerFloor; i++) {
       const type = rng() < restChance ? NODE_TYPES.REST : NODE_TYPES.FIGHT;
-      nodes.push({ id: `f${f}n${i}`, floor: f, type, connections: [] });
+      const node = { id: `f${f}n${i}`, floor: f, type, connections: [] };
+      if (type === NODE_TYPES.FIGHT && enemyPool.length > 0) {
+        node.enemyFactory = enemyPool[Math.floor(rng() * enemyPool.length)];
+      }
+      nodes.push(node);
     }
     floors.push(nodes);
   }
-  floors.push([
-    { id: `f${floorCount - 1}n0`, floor: floorCount - 1, type: NODE_TYPES.BOSS, connections: [] },
-  ]);
+  const bossNode = { id: `f${floorCount - 1}n0`, floor: floorCount - 1, type: NODE_TYPES.BOSS, connections: [] };
+  if (bossFactory) bossNode.enemyFactory = bossFactory;
+  floors.push([bossNode]);
 
   for (let f = 0; f < floors.length - 1; f++) {
     const current = floors[f];

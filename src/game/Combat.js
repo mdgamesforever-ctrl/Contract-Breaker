@@ -12,11 +12,18 @@ export class Combat {
     this.turn = 0;
     this.over = false;
     this.result = null; // 'win' | 'loss'
+
+    // Cards played this turn, in order (oldest first) -- lets effects like
+    // "bonus if played first" or "echo the last card played" see history.
+    this.cardsPlayedThisTurn = [];
+    // Set by cards like "Banner of the Broken Oath"; consumed by the next play.
+    this.freeNextCard = false;
   }
 
   startPlayerTurn() {
     if (this.over) return;
     this.turn += 1;
+    this.cardsPlayedThisTurn = [];
     this.player.startTurnEnergy();
     const drawn = this.deck.draw(this.handSize - this.deck.hand.length);
     this.log(
@@ -26,22 +33,36 @@ export class Combat {
   }
 
   // Plays the card at `handIndex` from the player's hand against the enemy.
-  playCard(handIndex) {
+  // `options` may carry a `choice` for cards with more than one mode (e.g.
+  // "The Reckoning Scale").
+  playCard(handIndex, options = {}) {
     if (this.over) throw new Error('Combat is already over');
     const card = this.deck.hand[handIndex];
     if (!card) throw new Error(`No card at hand index ${handIndex}`);
-    if (card.cost > this.player.energy) {
+
+    const free = this.freeNextCard;
+    const effectiveCost = free ? 0 : card.cost;
+    if (effectiveCost > this.player.energy) {
       throw new Error(`Not enough energy to play ${card.name}`);
     }
 
-    this.player.energy -= card.cost;
+    this.player.energy -= effectiveCost;
+    if (free) this.freeNextCard = false;
     this.deck.removeFromHand(handIndex);
-    card.play({ self: this.player, enemy: this.enemy, deck: this.deck });
+    card.play({
+      self: this.player,
+      enemy: this.enemy,
+      deck: this.deck,
+      combat: this,
+      cardsPlayedThisTurn: this.cardsPlayedThisTurn,
+      ...options,
+    });
     this.deck.discardPile.push(card);
+    this.cardsPlayedThisTurn.push(card);
 
     this.log(
-      `${this.player.name} plays ${card.name}${card.corrupted ? ' (corrupted)' : ''} ` +
-        `-> ${this.enemy.name} Faith: ${this.enemy.faith}/${this.enemy.maxFaith}`
+      `${this.player.name} plays ${card.name}${card.corrupted ? ' (corrupted)' : ''}` +
+        `${free ? ' (free)' : ''} -> ${this.enemy.name} Faith: ${this.enemy.faith}/${this.enemy.maxFaith}`
     );
 
     this._checkWinLoss();
@@ -61,14 +82,17 @@ export class Combat {
 
   endPlayerTurn() {
     if (this.over) return;
+    // Cards still sitting in hand were not played this turn.
+    for (const card of this.deck.hand) card.onTurnPassedUnplayed?.();
     this.deck.discardHand();
+    this.enemy.tickBurn(this.log);
     this._checkWinLoss();
     if (!this.over) this.enemyTurn();
   }
 
   enemyTurn() {
     if (this.over || this.enemy.isDefeated()) return;
-    const action = this.enemy.takeTurn(this.player);
+    const action = this.enemy.takeTurn(this.player, { deck: this.deck, log: this.log });
     this.log(
       `${this.enemy.name} attacks for ${action.amount} -> ` +
         `${this.player.name} Faith: ${this.player.faith}/${this.player.maxFaith}`

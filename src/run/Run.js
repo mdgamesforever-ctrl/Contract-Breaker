@@ -1,4 +1,5 @@
 import { NODE_TYPES } from './RunMap.js';
+import { BACKGROUNDS } from './backgrounds.js';
 
 // Drives sequential progression through a RunMap: pick a reachable node,
 // resolve it (fight/rest), and move on -- ending in victory at the boss
@@ -13,6 +14,7 @@ export class Run {
     this.visited = [];
     this.over = false;
     this.result = null; // 'victory' | 'defeat'
+    this.log(`[Background: ${BACKGROUNDS.mapScreen}] The Shard Network unfolds.`);
   }
 
   // Nodes reachable right now: floor 0 if the run hasn't started, otherwise
@@ -29,6 +31,8 @@ export class Run {
     if (!node) throw new Error(`Node ${nodeId} is not reachable from here`);
     this.currentNode = node;
     this.visited.push(node.id);
+    const background = node.type === NODE_TYPES.BOSS ? BACKGROUNDS.bossArena : BACKGROUNDS.nodeTransition;
+    this.log(`[Background: ${background}]`);
     this.log(`-- Entering ${node.type} node ${node.id} (floor ${node.floor}) --`);
     return node;
   }

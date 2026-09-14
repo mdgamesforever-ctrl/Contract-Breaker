@@ -27,7 +27,17 @@ export const DRAWBACK_POOL = [
 let nextInstanceId = 1;
 
 export class Card {
-  constructor({ id, name, cost, power = 0, type = 'attack', effect }) {
+  constructor({
+    id,
+    name,
+    cost,
+    power = 0,
+    type = 'attack',
+    effect,
+    art = null,
+    corruptedArt = null,
+    decayWhenUnplayed = false,
+  }) {
     if (typeof effect !== 'function') {
       throw new Error(`Card "${id}" requires an effect function`);
     }
@@ -40,11 +50,31 @@ export class Card {
     this.basePower = power;
     this.power = power;
     this.effect = effect;
+    this.art = art;
+    this.corruptedArt = corruptedArt;
 
     this.wear = 0;
     this.corrupted = false;
     this.drawback = null;
     this.graftedAbilities = [];
+
+    // "Severed Vow"-style cards get cheaper each turn they sit unplayed.
+    this.decayWhenUnplayed = decayWhenUnplayed;
+    this.unplayedTurns = 0;
+  }
+
+  get currentArt() {
+    return this.corrupted && this.corruptedArt ? this.corruptedArt : this.art;
+  }
+
+  // Advances wear by `amount`, triggering corruption once the threshold is
+  // crossed. Split out from play() so effects that force extra wear (e.g. a
+  // self-corrupting card, or an enemy that accelerates decay) can reuse it.
+  applyWear(amount = 1) {
+    this.wear += amount;
+    if (!this.corrupted && this.wear > WEAR_THRESHOLD) {
+      this.corrupt();
+    }
   }
 
   // Plays the card against the given context, then advances wear and
@@ -54,10 +84,17 @@ export class Card {
     if (this.drawback && typeof this.drawback.apply === 'function') {
       this.drawback.apply({ ...ctx, card: this });
     }
-    this.wear += 1;
-    if (!this.corrupted && this.wear > WEAR_THRESHOLD) {
-      this.corrupt();
-    }
+    this.unplayedTurns = 0;
+    if (this.decayWhenUnplayed) this.cost = this.baseCost;
+    this.applyWear(1);
+  }
+
+  // Called once per player turn for a card that sat in hand unplayed. Only
+  // has an effect when `decayWhenUnplayed` is set (e.g. "Severed Vow").
+  onTurnPassedUnplayed() {
+    if (!this.decayWhenUnplayed) return;
+    this.unplayedTurns += 1;
+    this.cost = Math.max(0, this.baseCost - this.unplayedTurns);
   }
 
   // Corrupts the card: raw power increases, but a random drawback is
@@ -78,6 +115,7 @@ export class Card {
     this.drawback = null;
     this.power = this.basePower;
     this.cost = this.baseCost;
+    this.unplayedTurns = 0;
   }
 
   // Permanently attaches a defeated enemy's ability to this card.
