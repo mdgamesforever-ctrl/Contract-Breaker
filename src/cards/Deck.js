@@ -1,11 +1,4 @@
-function shuffle(cards, rng = Math.random) {
-  const result = [...cards];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-}
+import { shuffle } from '../utils/shuffle.js';
 
 // Manages the draw / hand / discard / exile piles for a set of Cards.
 export class Deck {
