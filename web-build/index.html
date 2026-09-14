@@ -65,14 +65,22 @@
     flex-direction: column;
     position: relative;
     overflow: hidden;
-    /* Clear any device notch/cutout/gesture-bar area even though the
-       system bars themselves are hidden in immersive mode. */
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    /* Global safe-area rule for every screen (not per-screen padding):
+       env(safe-area-inset-*) covers a real notch/cutout, but resolves to
+       0px on any device without one -- which is most devices -- so on its
+       own it gives zero protection from the physical screen edge. max()
+       guarantees a real minimum gap either way, so nothing (title text,
+       card text, buttons) can ever render flush against the top/bottom/
+       side edge, with or without a cutout, on any screen in the app. */
+    padding-top: max(env(safe-area-inset-top), 16px);
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+    padding-left: max(env(safe-area-inset-left), 8px);
+    padding-right: max(env(safe-area-inset-right), 8px);
   }
 
   #topbar {
     flex: 0 0 auto;
-    padding: 2px 12px 0;
+    padding: 0 12px;
     text-align: center;
     position: relative;
     z-index: 5;
