@@ -261,20 +261,20 @@
 
   #enemy-zone {
     flex: 0 0 auto;
-    padding: 3px 12px 1px;
+    padding: 6px 12px 3px;
   }
 
   #enemy-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     text-align: left;
   }
 
   #enemy-portrait {
     flex: 0 0 auto;
-    width: 52px;
-    height: 52px;
+    width: 60px;
+    height: 60px;
     border-radius: 8px;
     object-fit: cover;
     border: 2px solid var(--border);
@@ -357,15 +357,15 @@
   #log-panel {
     flex: 0 1 auto;
     overflow-y: auto;
-    margin: 2px 10px;
-    padding: 3px 7px;
+    margin: 4px 10px;
+    padding: 4px 7px;
     background: rgba(0,0,0,0.45);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 0.56rem;
+    font-size: 0.58rem;
     color: var(--text-dim);
     min-height: 20px;
-    max-height: 42px;
+    max-height: 48px;
   }
 
   #log-panel div { margin-bottom: 1px; }
@@ -373,7 +373,7 @@
 
   #player-zone {
     flex: 0 0 auto;
-    padding: 1px 12px 1px;
+    padding: 3px 12px 3px;
   }
 
   #player-row {
@@ -413,13 +413,13 @@
     flex: 0 0 auto;
     display: flex;
     gap: 6px;
-    padding: 2px 10px;
+    padding: 4px 10px;
   }
 
   .action-btn {
     flex: 1;
-    padding: 5px 4px;
-    font-size: 0.62rem;
+    padding: 7px 4px;
+    font-size: 0.64rem;
     background: var(--panel-2);
     border: 1px solid var(--border);
     color: var(--text);
@@ -439,16 +439,16 @@
     position: relative;
     z-index: 2;
     margin-top: auto;
-    padding: 4px 8px 6px;
+    padding: 6px 8px 6px;
     display: flex;
-    gap: 6px;
+    gap: 7px;
     overflow-x: auto;
     background: linear-gradient(0deg, #000 10%, rgba(0,0,0,0) 100%);
   }
 
   .hand-card {
     flex: 0 0 auto;
-    width: 118px;
+    width: 132px;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 7px;
@@ -465,7 +465,7 @@
 
   .hand-card img {
     width: 100%;
-    height: 44px;
+    height: 50px;
     object-fit: cover;
     display: block;
     background: #000;
@@ -479,8 +479,8 @@
     position: absolute;
     top: 3px;
     left: 3px;
-    width: 16px;
-    height: 16px;
+    width: 17px;
+    height: 17px;
     border-radius: 50%;
     background: rgba(0,0,0,0.75);
     border: 1px solid var(--gold);
@@ -493,7 +493,7 @@
   }
 
   .hand-card-name {
-    font-size: 0.56rem;
+    font-size: 0.58rem;
     color: var(--gold-bright);
     padding: 3px 5px 0;
     line-height: 1.1;
@@ -502,20 +502,28 @@
     text-overflow: ellipsis;
   }
 
+  /* Fixed (not flex-grown) height, plain overflow:hidden -- deliberately
+     NOT using -webkit-line-clamp. The blurb text is pre-truncated in JS
+     (truncateForCard() in app.js) to a length measured to fit two lines at
+     this font-size/line-height, so this box never needs to clip anything
+     in practice; overflow:hidden here is only a backstop. line-clamp was
+     tried first and dropped: combined with a flex-grown height it let text
+     render past the visual 2-line limit and get hard-clipped mid-word
+     instead of showing an ellipsis, and separately its scrollHeight can
+     report the pre-clamp (unclamped) content height rather than the true
+     rendered height, making it unreliable to test against too. */
   .hand-card-effect {
-    font-size: 0.48rem;
+    flex: 0 0 auto;
+    height: 33px;
+    font-size: 0.52rem;
     color: var(--text-dim);
     padding: 1px 5px 4px;
-    line-height: 1.15;
-    flex: 1;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    line-height: 1.25;
     overflow: hidden;
   }
 
   .hand-card-wear {
-    font-size: 0.46rem;
+    font-size: 0.48rem;
     color: var(--corrupt);
     padding: 0 5px 3px;
   }

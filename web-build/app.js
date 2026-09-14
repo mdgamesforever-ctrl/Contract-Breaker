@@ -31,6 +31,22 @@ function cardBlurb(card) {
   return CARD_BLURBS[card.id] || card.type;
 }
 
+// Hard character cap for the hand-card effect text, truncated on a word
+// boundary with an ellipsis. The card panel is small and short in
+// landscape, so this guarantees the text always fits its fixed-height box
+// (see .hand-card-effect in index.html) instead of depending on
+// -webkit-line-clamp alone, which has proven unreliable across WebView
+// versions (it let text overflow and get hard-clipped mid-word).
+const HAND_CARD_BLURB_MAX = 44;
+
+function truncateForCard(text, max = HAND_CARD_BLURB_MAX) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  const base = lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut;
+  return base.replace(/[.,;:]$/, '') + '…';
+}
+
 function enemyIntent(enemy) {
   switch (enemy.constructor.name) {
     case 'CrownedWound':
@@ -404,7 +420,7 @@ function renderHand() {
         <div class="hand-card-cost-badge">${card.cost}</div>
       </div>
       <div class="hand-card-name">${card.name}</div>
-      <div class="hand-card-effect">${cardBlurb(card)}</div>
+      <div class="hand-card-effect">${truncateForCard(cardBlurb(card))}</div>
       ${card.wear > 0 ? `<div class="hand-card-wear">wear ${card.wear}${card.corrupted ? ' • corrupted' : ''}</div>` : ''}
     `;
 

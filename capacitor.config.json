@@ -4,5 +4,11 @@
   "webDir": "web-build",
   "android": {
     "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true,
+      "insetsHandling": "disable"
+    }
   }
 }
