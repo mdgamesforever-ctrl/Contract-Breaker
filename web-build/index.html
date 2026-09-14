@@ -30,12 +30,24 @@
     color: var(--text);
     font-family: Georgia, 'Times New Roman', serif;
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+    height: 100%;
   }
 
   body {
     min-height: 100vh;
     display: flex;
     justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Interactive elements: no long-press text-selection popup, no tap delay. */
+  .map-node, .hand-card, .action-btn, .modal-item, button {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   #app {

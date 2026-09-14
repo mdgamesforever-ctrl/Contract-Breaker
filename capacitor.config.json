@@ -1,0 +1,8 @@
+{
+  "appId": "com.futurepath.contractbreaker",
+  "appName": "Contract Breaker",
+  "webDir": "web-build",
+  "android": {
+    "allowMixedContent": false
+  }
+}

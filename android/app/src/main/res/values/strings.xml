@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Contract Breaker</string>
+    <string name="title_activity_main">Contract Breaker</string>
+    <string name="package_name">com.futurepath.contractbreaker</string>
+    <string name="custom_url_scheme">com.futurepath.contractbreaker</string>
+</resources>
