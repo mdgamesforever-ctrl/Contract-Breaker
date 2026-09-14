@@ -29,6 +29,7 @@ const FILES = [
   'src/run/backgrounds.js',
   'src/narrative/NarrativeEngine.js',
   'src/narrative/shards.js',
+  'src/narrative/EndingResolver.js',
 ];
 
 function stripModuleSyntax(source) {

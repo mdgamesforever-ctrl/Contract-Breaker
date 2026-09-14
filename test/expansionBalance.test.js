@@ -36,7 +36,7 @@ function autoPlay(combat, deck, player) {
   while (!combat.over && guard++ < 200) {
     combat.startPlayerTurn();
     let played = true;
-    while (played && deck.hand.length > 0 && !combat.over) {
+    while (played && deck.hand.length > 0 && !combat.over && !combat.pendingMercy) {
       played = false;
       let bestIndex = -1;
       let bestScore = -Infinity;
@@ -65,7 +65,14 @@ function autoPlay(combat, deck, player) {
       combat.anchor(deck.hand.length - 1, deck.hand[0]);
     }
 
+    // Boss-tier fights pause for the Mercy choice (see test/mercy.test.js
+    // for the mechanic itself); for a balance check, always finish the
+    // fight so outcomes stay comparable to the pre-Mercy numbers.
+    if (combat.pendingMercy) combat.resolveMercy('kill');
+
     if (!combat.over) combat.endPlayerTurn();
+
+    if (combat.pendingMercy) combat.resolveMercy('kill');
   }
   if (guard >= 200) throw new Error('autoPlay did not converge -- possible infinite loop');
 }
@@ -96,10 +103,11 @@ function runFullExpandedRun(seed, { maxFaith = 50 } = {}) {
     } else {
       const enemy = node.enemyFactory();
       const CombatClass = node.type === NODE_TYPES.BOSS ? BossCombat : Combat;
-      const combat = new CombatClass({ player, deck, enemy, log: silentLog });
+      const allowMercy = node.type === NODE_TYPES.BOSS || node.type === NODE_TYPES.MINIBOSS;
+      const combat = new CombatClass({ player, deck, enemy, log: silentLog, allowMercy });
       autoPlay(combat, deck, player);
       faithHistory.push(player.faith);
-      run.completeCurrentNode({ victory: combat.result === 'win' });
+      run.completeCurrentNode({ victory: combat.result === 'win' || combat.result === 'mercy' });
     }
   }
   if (guard >= 30) throw new Error('run did not converge -- possible infinite loop');

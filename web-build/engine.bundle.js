@@ -800,10 +800,14 @@ class Enemy extends Vessel {
 // ---- src/game/Combat.js (bundled, import/export stripped) ----
 const HAND_SIZE = 5;
 
+// Fraction of an enemy's maxFaith at which a Mercy-eligible fight pauses
+// for the kill-vs-mercy choice, per Combat's `allowMercy` option.
+const MERCY_THRESHOLD_RATIO = 0.12;
+
 // Drives a single combat encounter between a player Vessel (with a Deck)
 // and an enemy Vessel. Console-output only; `log` is injectable for tests.
 class Combat {
-  constructor({ player, deck, enemy, handSize = HAND_SIZE, log = console.log }) {
+  constructor({ player, deck, enemy, handSize = HAND_SIZE, log = console.log, allowMercy = false, mercyThreshold = null }) {
     this.player = player;
     this.deck = deck;
     this.enemy = enemy;
@@ -811,13 +815,25 @@ class Combat {
     this.log = log;
     this.turn = 0;
     this.over = false;
-    this.result = null; // 'win' | 'loss'
+    this.result = null; // 'win' | 'loss' | 'mercy'
 
     // Cards played this turn, in order (oldest first) -- lets effects like
     // "bonus if played first" or "echo the last card played" see history.
     this.cardsPlayedThisTurn = [];
     // Set by cards like "Banner of the Broken Oath"; consumed by the next play.
     this.freeNextCard = false;
+
+    // Mercy: a real, explicit kill-vs-spare choice for boss-tier fights.
+    // When allowMercy is set, the fight pauses (pendingMercy) the moment the
+    // enemy's Faith would cross mercyThreshold, holding it there instead of
+    // letting it fall to (or past) 0 -- see _maybeTriggerMercy() and
+    // resolveMercy(). Regular (non-boss) fights simply never set allowMercy,
+    // so isDefeated()/win checks behave exactly as before for them.
+    this.allowMercy = allowMercy;
+    this.mercyThreshold = mercyThreshold ?? Math.max(1, Math.round(enemy.maxFaith * MERCY_THRESHOLD_RATIO));
+    this.pendingMercy = false;
+    this.mercyResolved = false;
+    this.mercyGranted = false;
   }
 
   startPlayerTurn() {
@@ -837,6 +853,7 @@ class Combat {
   // "The Reckoning Scale").
   playCard(handIndex, options = {}) {
     if (this.over) throw new Error('Combat is already over');
+    if (this.pendingMercy) throw new Error('Resolve the mercy choice before playing another card');
     const card = this.deck.hand[handIndex];
     if (!card) throw new Error(`No card at hand index ${handIndex}`);
 
@@ -865,6 +882,7 @@ class Combat {
         `${free ? ' (free)' : ''} -> ${this.enemy.name} Faith: ${this.enemy.faith}/${this.enemy.maxFaith}`
     );
 
+    this._maybeTriggerMercy();
     this._checkWinLoss();
     return card;
   }
@@ -881,11 +899,12 @@ class Combat {
   }
 
   endPlayerTurn() {
-    if (this.over) return;
+    if (this.over || this.pendingMercy) return;
     // Cards still sitting in hand were not played this turn.
     for (const card of this.deck.hand) card.onTurnPassedUnplayed?.();
     this.deck.discardHand();
     this.enemy.tickBurn(this.log);
+    this._maybeTriggerMercy();
     this._checkWinLoss();
     if (!this.over) this.enemyTurn();
   }
@@ -909,6 +928,47 @@ class Combat {
     targetCard.graft(ability);
     this.log(`${this.player.name} grafts "${ability.name}" onto ${targetCard.name}`);
     return targetCard;
+  }
+
+  // If this fight allows Mercy and the enemy's Faith has fallen to (or past)
+  // mercyThreshold, holds it there and pauses the fight (pendingMercy) for
+  // an explicit resolveMercy() call, instead of letting it continue toward
+  // 0 and end the fight as an ordinary win. Fires at most once per combat
+  // (mercyResolved gates it after the player has answered).
+  _maybeTriggerMercy() {
+    if (!this.allowMercy || this.mercyResolved || this.pendingMercy) return;
+    if (this.enemy.faith <= this.mercyThreshold) {
+      if (this.enemy.faith <= 0) this.enemy.faith = this.mercyThreshold;
+      this.pendingMercy = true;
+      this.log(`${this.enemy.name} is broken and at your mercy. Kill, or spare it?`);
+    }
+  }
+
+  // Resolves a pending Mercy choice. 'kill' delivers the finishing blow and
+  // lets the fight conclude normally (still subject to e.g. the final
+  // boss's tether/reform rule in BossCombat). 'mercy' ends the fight
+  // immediately with result 'mercy': the enemy survives, broken, at
+  // mercyThreshold Faith -- no further damage, no loot/graft opportunity
+  // (app.js only offers Graft when result === 'win').
+  resolveMercy(choice) {
+    if (this.over) throw new Error('Combat is already over');
+    if (!this.pendingMercy) throw new Error('No mercy choice is pending');
+    if (choice !== 'kill' && choice !== 'mercy') throw new Error(`Unknown mercy choice: ${choice}`);
+
+    this.pendingMercy = false;
+    this.mercyResolved = true;
+
+    if (choice === 'mercy') {
+      this.mercyGranted = true;
+      this.over = true;
+      this.result = 'mercy';
+      this.log(`${this.player.name} shows mercy. ${this.enemy.name} is spared, broken but alive.`);
+    } else {
+      this.log(`${this.player.name} delivers the finishing blow.`);
+      this.enemy.takeDamage(this.enemy.faith);
+      this._checkWinLoss();
+    }
+    return this.result;
   }
 
   _checkWinLoss() {
@@ -1784,18 +1844,30 @@ class NarrativeEngine {
 
 // ---- src/narrative/shards.js (bundled, import/export stripped) ----
 // A pool of story fragments ("memory shards"). `about` links a shard to the
-// fight/node it recontextualizes once enough shards have been collected.
+// fight/theme it recontextualizes once enough shards have been collected
+// (see NarrativeEngine). Only a handful are revealed in any single run (one
+// per node entered, and a run only ever visits a handful of nodes), so the
+// pool is kept large and varied -- ~20 fragments across six threads of the
+// same story -- for replay variety, not because every run sees all of them.
+//
+// The throughline (deliberately never stated outright in any single shard,
+// only assembled by the player across several): the "Vessel" is not a
+// separate hero descending into someone else's underworld. It is a piece of
+// the Dying God's own unraveling mind, given just enough shape to walk its
+// own dissolving memories and decide what survives them. Every "enemy" is a
+// memory turned hostile by the god's own decay; every "victory" erases one.
+// The Broken Acolyte was a real devotee, broken not by the god but by an
+// earlier Vessel -- there have been others, and none of them stayed
+// themselves. Anchoring "restores" a card by quietly stealing a memory from
+// the god to pay for it. And at the end, wearing the Vessel's own face, is
+// the god itself.
 function createShardPool() {
   return [
+    // ---- origin: what the Vessel actually is ----
     {
       id: 'shard-origin-1',
       text: 'A flicker: the Vessel remembers holding a name it can no longer speak.',
       about: 'origin',
-    },
-    {
-      id: 'shard-acolyte-1',
-      text: 'The Broken Acolyte once knelt at the same altar as you.',
-      about: 'broken-acolyte',
     },
     {
       id: 'shard-origin-2',
@@ -1803,19 +1875,218 @@ function createShardPool() {
       about: 'origin',
     },
     {
+      id: 'shard-origin-3',
+      text: "The Vessel was not born. It was carved out of the god's own dying will, given just enough shape to walk.",
+      about: 'origin',
+    },
+    {
+      id: 'shard-origin-4',
+      text: 'There have been other Vessels before this one. None of them came back as themselves.',
+      about: 'origin',
+    },
+
+    // ---- broken-acolyte: the mid-run boss's real story ----
+    {
+      id: 'shard-acolyte-1',
+      text: 'The Broken Acolyte once knelt at the same altar as you.',
+      about: 'broken-acolyte',
+    },
+    {
       id: 'shard-acolyte-2',
       text: 'The Acolyte was not corrupted by the god -- it was corrupted by you.',
       about: 'broken-acolyte',
     },
+    {
+      id: 'shard-acolyte-3',
+      text: 'Before it broke, the Acolyte begged the last Vessel to stop. The last Vessel did not stop.',
+      about: 'broken-acolyte',
+    },
+    {
+      id: 'shard-acolyte-4',
+      text: 'The Acolyte still prays. It no longer remembers what it is praying for, or to whom.',
+      about: 'broken-acolyte',
+    },
+
+    // ---- boss: the Dying God at the center of the descent ----
     {
       id: 'shard-boss-1',
       text: 'The thing you march toward at the end is wearing your own face.',
       about: 'boss',
     },
     {
+      id: 'shard-boss-2',
+      text: 'The god did not choose to die. It chose to be eaten slowly, by something it hoped would be kinder than time.',
+      about: 'boss',
+    },
+    {
+      id: 'shard-boss-3',
+      text: 'Every fight on this descent is a memory the god would rather forget. You are doing it a favor. You are also the reason it is forgetting at all.',
+      about: 'boss',
+    },
+    {
+      id: 'shard-boss-4',
+      text: 'At the center of everything is a throne with no one sitting in it, because whoever sat there is you.',
+      about: 'boss',
+    },
+
+    // ---- anchor: what the Anchor mechanic is actually paying for ----
+    {
       id: 'shard-anchor-1',
       text: 'Anchoring does not restore a card. It steals a memory from the god to spare it.',
       about: 'anchor',
     },
+    {
+      id: 'shard-anchor-2',
+      text: 'Every anchor is a small mercy and a small theft in the same motion. The god will not remember choosing to give this up.',
+      about: 'anchor',
+    },
+    {
+      id: 'shard-anchor-3',
+      text: 'You have anchored before, in other attempts, other Vessels. The god has fewer memories left each time -- fewer with each of you.',
+      about: 'anchor',
+    },
+
+    // ---- mercy: preparing the player for the choice waiting at every boss ----
+    {
+      id: 'shard-mercy-1',
+      text: 'To kill a broken thing is clean. To let it live broken is not mercy -- it is a debt you will not be the one to pay.',
+      about: 'mercy',
+    },
+    {
+      id: 'shard-mercy-2',
+      text: 'The last Vessel who chose mercy vanished from every memory that came after. Choosing it here may do the same to you.',
+      about: 'mercy',
+    },
+    {
+      id: 'shard-mercy-3',
+      text: 'Sparing something does not undo what was already taken from it. It only decides who carries the rest.',
+      about: 'mercy',
+    },
+
+    // ---- corruption: the wear/decay system, in the god's own words ----
+    {
+      id: 'shard-corruption-1',
+      text: 'A corrupted card does not lie. It simply remembers what it cost you to use it so many times.',
+      about: 'corruption',
+    },
+    {
+      id: 'shard-corruption-2',
+      text: "The god's memories corrupt the same way yours do -- not all at once, but one wound too many, in the same place, again and again.",
+      about: 'corruption',
+    },
   ];
+}
+
+
+// ---- src/narrative/EndingResolver.js (bundled, import/export stripped) ----
+// Resolves which of the game's 3-5 endings a completed run earns, from a
+// plain summary of run state -- no engine coupling, so it's trivial to
+// test in isolation (mirrors NarrativeEngine's constructor-plus-plain-
+// methods shape rather than reaching back into Run/Combat itself).
+//
+// Gated by exactly the dimensions the story cares about: whether the run
+// ended in victory or defeat, how many memory shards were collected,
+// whether Mercy was chosen on each boss encountered (the final Dying God,
+// and the mid-run Broken Acolyte when that node was on the player's path),
+// and how much Faith remained at the very end.
+
+const ENDING = Object.freeze({
+  NAMES_UNSPOKEN: 'names-unspoken',
+  LONG_MERCY: 'long-mercy',
+  VESSEL_ASCENDS: 'vessel-ascends',
+  HOLLOW_VICTORY: 'hollow-victory',
+  TETHER_HOLDS: 'tether-holds',
+});
+
+// A boss's mercy choice is 'kill', 'mercy', or null (that boss was never
+// reached/resolved on this run -- e.g. the map path skipped the mid-run
+// Broken Acolyte entirely, or the run ended before reaching it).
+const NAMES_UNSPOKEN_SHARD_THRESHOLD = 5;
+const TETHER_HOLDS_SHARD_THRESHOLD = 4;
+const HOLLOW_VICTORY_FAITH_RATIO = 0.5;
+
+const ENDING_TEXT = {
+  [ENDING.NAMES_UNSPOKEN]: {
+    title: 'Names Unspoken, Remembered',
+    text: [
+      'You remembered enough to know better, and chose mercy anyway, twice.',
+      'The god fades still broken, still dying, but it dies knowing its own name one more time,',
+      'and so does the Acolyte kneeling beside it.',
+      'Nothing is undone. Something, for once, is not made worse.',
+    ].join(' '),
+  },
+  [ENDING.LONG_MERCY]: {
+    title: 'The Long Mercy',
+    text: [
+      'You could have finished it. You chose not to.',
+      'The god does not thank you; it can no longer hold a thought that long.',
+      'But it is allowed to end on its own terms, at its own pace, unconsumed.',
+      'You walk back out of the Shard Network carrying nothing you took by force.',
+    ].join(' '),
+  },
+  [ENDING.VESSEL_ASCENDS]: {
+    title: 'The Vessel Ascends',
+    text: [
+      'The last tether snaps. What is left of the god pours into the shape that was carved to hold it,',
+      'and the shape does not refuse.',
+      'You are standing where the throne was.',
+      'You are beginning to understand why it was always empty before you sat down.',
+    ].join(' '),
+  },
+  [ENDING.HOLLOW_VICTORY]: {
+    title: 'A Hollow Victory',
+    text: [
+      'The god is gone. You are still standing, barely; more debt than Vessel by the end,',
+      'held together by whatever you did not have to spend.',
+      'Something has been won. It is hard, afterward, to remember what.',
+    ].join(' '),
+  },
+  [ENDING.TETHER_HOLDS]: {
+    title: 'The Tether Holds',
+    highRecallText: [
+      'Your Faith breaks before the god’s does.',
+      'But you had already remembered almost everything: who sent you, what it cost, whose face waited at the end.',
+      'The next Vessel will not start from nothing.',
+      'That is not the same as winning.',
+    ].join(' '),
+    lowRecallText: [
+      'Your Faith breaks before the god’s does.',
+      'The descent ends here, mostly unremembered, one more attempt folded into all the ones before it.',
+      'Somewhere, another Vessel is already being carved.',
+    ].join(' '),
+  },
+};
+
+class EndingResolver {
+  // `shardsCollected`: number of memory shards revealed this run.
+  // `mercyChoices`: { dyingGod: 'kill'|'mercy'|null, acolyte: 'kill'|'mercy'|null }.
+  // `finalFaith`/`maxFaith`: the player's Faith at the moment the run ended.
+  resolve({ victory, shardsCollected = 0, mercyChoices = {}, finalFaith = 0, maxFaith = 1 }) {
+    const dyingGodMercy = mercyChoices.dyingGod === 'mercy';
+    const acolyteMercy = mercyChoices.acolyte === 'mercy';
+    const acolyteEncountered = mercyChoices.acolyte != null;
+    const faithRatio = maxFaith > 0 ? finalFaith / maxFaith : 0;
+
+    if (!victory) {
+      const highRecall = shardsCollected >= TETHER_HOLDS_SHARD_THRESHOLD;
+      return {
+        id: ENDING.TETHER_HOLDS,
+        title: ENDING_TEXT[ENDING.TETHER_HOLDS].title,
+        text: highRecall ? ENDING_TEXT[ENDING.TETHER_HOLDS].highRecallText : ENDING_TEXT[ENDING.TETHER_HOLDS].lowRecallText,
+      };
+    }
+
+    let id;
+    if (dyingGodMercy && (acolyteMercy || !acolyteEncountered) && shardsCollected >= NAMES_UNSPOKEN_SHARD_THRESHOLD) {
+      id = ENDING.NAMES_UNSPOKEN;
+    } else if (dyingGodMercy) {
+      id = ENDING.LONG_MERCY;
+    } else if (faithRatio >= HOLLOW_VICTORY_FAITH_RATIO) {
+      id = ENDING.VESSEL_ASCENDS;
+    } else {
+      id = ENDING.HOLLOW_VICTORY;
+    }
+
+    return { id, title: ENDING_TEXT[id].title, text: ENDING_TEXT[id].text };
+  }
 }

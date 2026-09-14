@@ -45,6 +45,82 @@ function cardBlurb(card) {
   return CARD_BLURBS[card.id] || card.type;
 }
 
+// ---------------------------------------------------------------------
+// Narrative flavor lines for mechanical moments (a card corrupting, an
+// Anchor, a Graft) -- shown in the combat log alongside the engine's own
+// log line, purely for UI flavor. `{card}`/`{ability}` are substituted
+// from the event.
+// ---------------------------------------------------------------------
+const CORRUPTION_FLAVOR = [
+  '{card} remembers this differently now.',
+  "Something in {card} gives way. It will not forget being used like this.",
+  '{card} corrupts. Whatever it was before, it is not that anymore.',
+  'The wear finally catches up to {card}. It comes back changed.',
+];
+
+const ANCHOR_FLAVOR = [
+  "A memory leaves the god's grasp to save this card.",
+  'The god forgets a little more, so {card} can forget its own decay.',
+  'Something is quietly stolen so something else can be whole again.',
+];
+
+const GRAFT_FLAVOR = [
+  '{ability} settles into {card} like it was always meant to be there.',
+  '{card} carries a piece of what it just destroyed.',
+  'The graft takes. {card} will not be entirely itself again.',
+];
+
+function pickFlavor(pool, vars = {}) {
+  let line = pool[Math.floor(Math.random() * pool.length)];
+  for (const key of Object.keys(vars)) line = line.split(`{${key}}`).join(vars[key]);
+  return line;
+}
+
+// Logs a flavor line for every card that just transitioned to corrupted
+// (compares a pre-action snapshot of corrupted card ids against the deck's
+// current state), so corruption reads as a story beat regardless of what
+// caused it (self-corruption, Titan's Wake wearing another hand card,
+// Fractured Widow/Broken Acolyte fraying a card on their turn, etc).
+function snapshotCorrupted() {
+  return new Set(G.deck.allCards().filter((c) => c.corrupted).map((c) => c.id));
+}
+
+function logNewCorruptions(beforeSet) {
+  for (const card of G.deck.allCards()) {
+    if (card.corrupted && !beforeSet.has(card.id)) {
+      combatLog(pickFlavor(CORRUPTION_FLAVOR, { card: card.name }));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// Combat visual effects: per-card-type flashes on play, and a brief
+// "telegraph" pulse on the enemy portrait before its attack lands (see the
+// End Turn handler). CSS-only (index.html); works identically with
+// placeholder or final art since it never touches the <img> itself, only
+// overlays/transforms around it.
+// ---------------------------------------------------------------------
+const TELEGRAPH_MS = 420;
+
+function flashElement(id, className) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove(className);
+  void el.offsetWidth; // force reflow so a repeated trigger restarts the animation
+  el.classList.add(className);
+  el.addEventListener('animationend', () => el.classList.remove(className), { once: true });
+}
+
+// Fires the right flash(es) for a just-played card: red impact on the enemy
+// portrait for damage dealt, a gold glow on the player zone for Faith
+// restored, and a glitch/static flicker on the hand zone if the card
+// (or anything it wore down) corrupted as a result.
+function triggerCardEffectFx(card, enemyDelta, playerDelta) {
+  if (enemyDelta < 0) flashElement('enemy-portrait', 'fx-damage');
+  if (playerDelta > 0) flashElement('player-zone', 'fx-heal');
+  if (card && card.corrupted) flashElement('hand-zone', 'fx-corrupt');
+}
+
 // Hard character cap for the hand-card effect text, truncated on a word
 // boundary with an ellipsis. The card panel is small and short in
 // landscape, so this guarantees the text always fits its fixed-height box
@@ -111,6 +187,10 @@ const G = {
   lastShardText: null,
   lastTwistText: null,
   currentScreen: null,
+  // { dyingGod, acolyte } each 'kill' | 'mercy' | null (never reached/resolved).
+  mercyChoices: { dyingGod: null, acolyte: null },
+  mercyModalCombat: null,
+  modalDismissable: true,
 };
 
 const screenEl = document.getElementById('screen');
@@ -127,7 +207,7 @@ function openModal(html) {
   modalOverlay.classList.remove('hidden');
 }
 modalOverlay.addEventListener('click', (e) => {
-  if (e.target === modalOverlay) closeModal();
+  if (e.target === modalOverlay && G.modalDismissable) closeModal();
 });
 
 // ---------------------------------------------------------------------
@@ -217,6 +297,8 @@ function newRun() {
   G.combat = null;
   G.lastShardText = null;
   G.lastTwistText = null;
+  G.mercyChoices = { dyingGod: null, acolyte: null };
+  G.mercyModalCombat = null;
   renderMapScreen();
 }
 
@@ -340,7 +422,8 @@ function onNodeClick(nodeId) {
 
   const enemy = node.enemyFactory ? node.enemyFactory() : createCrownedWound();
   const CombatClass = node.type === 'boss' ? BossCombat : Combat;
-  G.combat = new CombatClass({ player: G.player, deck: G.deck, enemy, log: combatLog });
+  const allowMercy = node.type === 'boss' || node.type === 'miniboss';
+  G.combat = new CombatClass({ player: G.player, deck: G.deck, enemy, log: combatLog, allowMercy });
   clearLog();
   G.combat.startPlayerTurn();
   renderCombatScreen();
@@ -457,12 +540,25 @@ function refreshCombatUI() {
 
   renderActionRow();
   renderHand();
+
+  if (combat.pendingMercy && G.mercyModalCombat !== combat) {
+    G.mercyModalCombat = combat;
+    openMercyChoiceModal();
+  }
 }
 
 function renderActionRow() {
   const combat = G.combat;
   const row = document.getElementById('action-row');
   row.innerHTML = '';
+
+  if (combat.pendingMercy) {
+    const waitEl = document.createElement('div');
+    waitEl.className = 'mercy-pending-note';
+    waitEl.textContent = `${combat.enemy.name} awaits your judgment...`;
+    row.appendChild(waitEl);
+    return;
+  }
 
   if (!combat.over) {
     const anchorBtn = document.createElement('button');
@@ -476,20 +572,37 @@ function renderActionRow() {
     endBtn.className = 'action-btn primary';
     endBtn.textContent = 'End Turn';
     endBtn.addEventListener('click', () => {
-      const beforePlayerFaith = G.player.faith;
-      G.combat.endPlayerTurn();
-      if (!G.combat.over) G.combat.startPlayerTurn();
-      const playerDelta = G.player.faith - beforePlayerFaith;
-      if (playerDelta !== 0) {
-        showFloatingNumber('player-zone', playerDelta);
-        playSfx('damage');
-      }
-      refreshCombatUI();
-      const panel = document.getElementById('log-panel');
-      if (panel) panel.scrollTop = panel.scrollHeight;
+      endBtn.disabled = true;
+      const portrait = document.getElementById('enemy-portrait');
+      // Brief attack telegraph (matches the existing #enemy-intent text) --
+      // plays for TELEGRAPH_MS before the enemy's attack actually resolves,
+      // so combat reads clearly without needing to stop and read the log.
+      if (portrait) portrait.classList.add('telegraph');
+      setTimeout(() => {
+        if (portrait) portrait.classList.remove('telegraph');
+        const beforePlayerFaith = G.player.faith;
+        const beforeCorrupted = snapshotCorrupted();
+        G.combat.endPlayerTurn();
+        if (!G.combat.over) G.combat.startPlayerTurn();
+        const playerDelta = G.player.faith - beforePlayerFaith;
+        if (playerDelta !== 0) {
+          showFloatingNumber('player-zone', playerDelta);
+          playSfx('damage');
+          const combatLayer = document.querySelector('.combat-layer');
+          if (combatLayer) {
+            combatLayer.classList.add('hit-shake');
+            setTimeout(() => combatLayer.classList.remove('hit-shake'), 260);
+          }
+        }
+        logNewCorruptions(beforeCorrupted);
+        refreshCombatUI();
+        const panel = document.getElementById('log-panel');
+        if (panel) panel.scrollTop = panel.scrollHeight;
+      }, TELEGRAPH_MS);
     });
     row.appendChild(endBtn);
   } else {
+    const survived = combat.result === 'win' || combat.result === 'mercy';
     if (combat.result === 'win') {
       const graftBtn = document.createElement('button');
       graftBtn.className = 'action-btn primary';
@@ -499,8 +612,8 @@ function renderActionRow() {
       row.appendChild(graftBtn);
     }
     const continueBtn = document.createElement('button');
-    continueBtn.className = 'action-btn' + (combat.result === 'win' ? '' : ' danger');
-    continueBtn.textContent = combat.result === 'win' ? 'Continue' : 'Accept Defeat';
+    continueBtn.className = 'action-btn' + (survived ? '' : ' danger');
+    continueBtn.textContent = survived ? 'Continue' : 'Accept Defeat';
     continueBtn.addEventListener('click', finishCombat);
     row.appendChild(continueBtn);
   }
@@ -567,6 +680,8 @@ function playCardNow(index, options) {
   const player = G.player;
   const beforeEnemyFaith = enemy.faith;
   const beforePlayerFaith = player.faith;
+  const beforeCorrupted = snapshotCorrupted();
+  const playedCard = G.deck.hand[index];
   let played = false;
   try {
     G.combat.playCard(index, options);
@@ -581,11 +696,56 @@ function playCardNow(index, options) {
     if (enemyDelta !== 0) showFloatingNumber('enemy-zone', enemyDelta);
     if (playerDelta !== 0) showFloatingNumber('player-zone', playerDelta);
     playSfx(enemyDelta < 0 || playerDelta < 0 ? 'damage' : 'cardPlay');
+    triggerCardEffectFx(playedCard, enemyDelta, playerDelta);
+    logNewCorruptions(beforeCorrupted);
   }
 
   refreshCombatUI();
   const panel = document.getElementById('log-panel');
   if (panel) panel.scrollTop = panel.scrollHeight;
+}
+
+// ---------------------------------------------------------------------
+// Mercy: a real, explicit choice on boss fights (see Combat.pendingMercy).
+// A modal opens automatically (from refreshCombatUI) the moment the engine
+// reports pendingMercy, and isn't dismissable by tapping outside it --
+// this is a required story beat, not an optional flow the player can just
+// click past.
+// ---------------------------------------------------------------------
+function openMercyChoiceModal() {
+  const combat = G.combat;
+  const enemy = combat.enemy;
+  G.modalDismissable = false;
+  openModal(`
+    <h2>${enemy.name} is Broken</h2>
+    <div class="modal-sub">Held at ${enemy.faith} Faith, it can't fight back. Finish it, or spare it?</div>
+    <button class="action-btn danger" id="mercy-kill">Deliver the Finishing Blow</button>
+    <button class="action-btn primary" id="mercy-spare" style="margin-top:8px">Show Mercy</button>
+  `);
+  document.getElementById('mercy-kill').addEventListener('click', () => resolveMercyChoice('kill'));
+  document.getElementById('mercy-spare').addEventListener('click', () => resolveMercyChoice('mercy'));
+}
+
+// Which ending-tracking key a boss-type node's mercy choice belongs under.
+function mercyKeyForNode(node) {
+  if (!node) return null;
+  if (node.type === 'boss') return 'dyingGod';
+  if (node.type === 'miniboss') return 'acolyte';
+  return null;
+}
+
+function resolveMercyChoice(choice) {
+  G.modalDismissable = true;
+  closeModal();
+  try {
+    G.combat.resolveMercy(choice);
+    const key = mercyKeyForNode(G.run.currentNode);
+    if (key) G.mercyChoices[key] = choice;
+    playSfx(choice === 'mercy' ? 'mercy' : 'damage');
+  } catch (err) {
+    combatLog(`(${err.message})`);
+  }
+  refreshCombatUI();
 }
 
 // ---------------------------------------------------------------------
@@ -652,6 +812,7 @@ function openAnchorStepTwo(sacrificeIndex) {
       try {
         G.combat.anchor(sacrificeIndex, target);
         playSfx('anchor');
+        combatLog(pickFlavor(ANCHOR_FLAVOR, { card: target.name }));
       } catch (err) {
         combatLog(`(${err.message})`);
       }
@@ -724,6 +885,7 @@ function openGraftStepTwo(ability) {
       try {
         G.combat.graft(ability, target);
         playSfx('graft');
+        combatLog(pickFlavor(GRAFT_FLAVOR, { card: target.name, ability: ability.name }));
       } catch (err) {
         combatLog(`(${err.message})`);
       }
@@ -737,10 +899,11 @@ function openGraftStepTwo(ability) {
 // ---------------------------------------------------------------------
 function finishCombat() {
   refreshCombatUI();
-  const victory = G.combat.result === 'win';
-  playSfx(victory ? 'victory' : 'defeat');
-  G.run.completeCurrentNode({ victory });
+  const survived = G.combat.result === 'win' || G.combat.result === 'mercy';
+  if (G.combat.result !== 'mercy') playSfx(survived ? 'victory' : 'defeat');
+  G.run.completeCurrentNode({ victory: survived });
   G.combat = null;
+  G.mercyModalCombat = null;
   if (G.run.over) renderEndScreen();
   else renderMapScreen();
 }
@@ -750,12 +913,19 @@ function finishCombat() {
 // ---------------------------------------------------------------------
 function renderEndScreen() {
   const victory = G.run.result === 'victory';
+  const ending = new EndingResolver().resolve({
+    victory,
+    shardsCollected: G.narrative.revealed.length,
+    mercyChoices: G.mercyChoices,
+    finalFaith: G.player.faith,
+    maxFaith: G.player.maxFaith,
+  });
+
   screenEl.innerHTML = `
     <div id="end-screen">
       <h1 class="brand-title end-brand">Contract Breaker</h1>
-      <div id="end-title" class="${victory ? 'victory' : 'defeat'}">${
-        victory ? 'THE TETHER IS SEVERED' : 'YOUR FAITH IS BROKEN'
-      }</div>
+      <div id="end-title" class="${victory ? 'victory' : 'defeat'}">${ending.title}</div>
+      <div id="end-flavor">${ending.text}</div>
       <div id="end-stats">
         Floors cleared: <b>${G.run.visited.length}</b><br/>
         Memory shards recovered: <b>${G.narrative.revealed.length}</b><br/>

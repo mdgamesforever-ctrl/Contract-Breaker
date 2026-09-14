@@ -103,6 +103,11 @@ const AudioManager = (() => {
       tone(880, { duration: 0.2, type: 'sine', startGain: 0.14 });
       tone(1318, { duration: 0.25, type: 'sine', startGain: 0.1, delay: 0.06 });
     },
+    // Soft, gentle -- deliberately not a fanfare; mercy is a quiet choice.
+    mercy: () => {
+      tone(392, { duration: 0.5, type: 'sine', startGain: 0.1 });
+      tone(494, { duration: 0.6, type: 'sine', startGain: 0.08, delay: 0.12 });
+    },
   };
 
   function sfx(name) {
