@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>Contract Breaker</title>
 <style>
   :root {
@@ -32,14 +32,15 @@
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     overscroll-behavior: none;
+    width: 100%;
     height: 100%;
+    overflow: hidden;
   }
 
   body {
-    min-height: 100vh;
     display: flex;
     justify-content: center;
-    overflow: hidden;
+    align-items: stretch;
   }
 
   /* Interactive elements: no long-press text-selection popup, no tap delay. */
@@ -50,41 +51,44 @@
     -webkit-touch-callout: none;
   }
 
+  /* Landscape-first, edge-to-edge fill. No portrait-phone width cap here --
+     that's what caused the black side bars under Android's fullscreen
+     WebView. The max-width only keeps things sane on very wide desktop
+     browser windows used for testing; any realistic phone/tablet landscape
+     width fills completely. */
   #app {
     width: 100%;
-    max-width: 420px;
-    min-height: 100vh;
+    max-width: 1100px;
+    height: 100%;
     background: var(--bg);
     display: flex;
     flex-direction: column;
     position: relative;
-    border-left: 1px solid #000;
-    border-right: 1px solid #000;
-    box-shadow: 0 0 40px rgba(0,0,0,0.8);
     overflow: hidden;
+    /* Clear any device notch/cutout/gesture-bar area even though the
+       system bars themselves are hidden in immersive mode. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
 
   #topbar {
-    padding: 10px 12px 6px;
+    flex: 0 0 auto;
+    padding: 2px 12px 0;
     text-align: center;
-    background: linear-gradient(180deg, #000 0%, rgba(0,0,0,0) 100%);
     position: relative;
     z-index: 5;
   }
 
   #topbar h1 {
     margin: 0;
-    font-size: 1.05rem;
-    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
     color: var(--gold);
     text-transform: uppercase;
-    text-shadow: 0 0 8px rgba(212,175,106,0.4);
+    text-shadow: 0 0 6px rgba(212,175,106,0.4);
   }
 
   #topbar .subtitle {
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    letter-spacing: 0.08em;
+    display: none;
   }
 
   #screen {
@@ -95,7 +99,11 @@
     min-height: 0;
   }
 
-  /* ---------- Map screen ---------- */
+  /* ---------- Map screen ----------
+     Landscape-native: floors run left -> right, nodes within a floor run
+     top -> bottom, all positioned by percentage so the whole run fits in
+     one viewport with no scrolling. The shard banner is an overlay strip,
+     not a flex sibling, so it never steals height from the node area. */
   #map-screen {
     flex: 1;
     display: flex;
@@ -103,7 +111,7 @@
     background-size: cover;
     background-position: center;
     position: relative;
-    min-height: 520px;
+    min-height: 0;
   }
 
   #map-screen::before {
@@ -117,27 +125,27 @@
   #map-scroll {
     position: relative;
     flex: 1;
-    overflow-y: auto;
-    padding: 20px 0 30px;
+    min-height: 0;
+    overflow: auto;
   }
 
   #map-svg-wrap {
-    position: relative;
-    width: 100%;
+    position: absolute;
+    inset: 0;
   }
 
   .map-node {
     position: absolute;
     transform: translate(-50%, -50%);
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #2a1f1a, #100b09 70%);
     border: 2px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1.15rem;
     cursor: default;
     z-index: 2;
     box-shadow: 0 2px 10px rgba(0,0,0,0.6);
@@ -165,9 +173,9 @@
   }
 
   .map-node.boss {
-    width: 68px;
-    height: 68px;
-    font-size: 1.9rem;
+    width: 54px;
+    height: 54px;
+    font-size: 1.4rem;
   }
 
   .map-node-label {
@@ -175,7 +183,7 @@
     top: 100%;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 0.55rem;
+    font-size: 0.5rem;
     color: var(--text-dim);
     white-space: nowrap;
     margin-top: 2px;
@@ -183,22 +191,26 @@
   }
 
   #map-footer {
-    position: relative;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 3;
-    padding: 10px 14px 16px;
-    background: linear-gradient(0deg, #000 0%, rgba(0,0,0,0) 100%);
+    padding: 4px 10px;
+    pointer-events: none;
   }
 
   #shard-banner {
-    background: rgba(20,10,10,0.85);
+    background: rgba(12,8,7,0.9);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 0.72rem;
+    padding: 4px 8px;
+    font-size: 0.6rem;
     color: var(--gold-bright);
     font-style: italic;
-    margin-bottom: 8px;
-    min-height: 1.4em;
+    min-height: 1.2em;
+    max-height: 2.6em;
+    overflow: hidden;
   }
 
   #shard-banner.twist {
@@ -208,7 +220,10 @@
     font-style: normal;
   }
 
-  /* ---------- Combat screen ---------- */
+  /* ---------- Combat screen ----------
+     Landscape is wide but short (a locked-landscape phone can be as short
+     as ~380-412px tall), so this is a compact, horizontal-first layout
+     rather than a tall vertical stack. */
   #combat-screen {
     flex: 1;
     display: flex;
@@ -216,7 +231,7 @@
     background-size: cover;
     background-position: center;
     position: relative;
-    min-height: 520px;
+    min-height: 0;
   }
 
   #combat-screen::before {
@@ -237,37 +252,56 @@
   }
 
   #enemy-zone {
-    padding: 10px 14px 4px;
-    text-align: center;
+    flex: 0 0 auto;
+    padding: 3px 12px 1px;
+  }
+
+  #enemy-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
   }
 
   #enemy-portrait {
-    width: 110px;
-    height: 110px;
-    border-radius: 10px;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
     object-fit: cover;
     border: 2px solid var(--border);
-    box-shadow: 0 0 20px rgba(0,0,0,0.7);
+    box-shadow: 0 0 14px rgba(0,0,0,0.7);
     background: #000;
   }
 
+  #enemy-info {
+    flex: 1;
+    min-width: 0;
+  }
+
   #enemy-name {
-    margin: 6px 0 2px;
+    margin: 0;
     color: var(--gold-bright);
-    font-size: 0.95rem;
-    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   #enemy-intent {
-    font-size: 0.65rem;
+    font-size: 0.55rem;
     color: var(--text-dim);
     min-height: 1em;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .bar {
-    height: 14px;
-    border-radius: 7px;
+    height: 11px;
+    border-radius: 6px;
     background: #1a1310;
     border: 1px solid var(--border);
     overflow: hidden;
@@ -280,6 +314,7 @@
     transition: width 0.25s ease;
   }
 
+  .bar-faith { max-width: 420px; }
   .bar-faith .bar-fill { background: linear-gradient(90deg, var(--blood), var(--blood-bright)); }
   .bar-label {
     position: absolute;
@@ -287,23 +322,25 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.6rem;
+    font-size: 0.52rem;
     color: #fff;
     text-shadow: 0 1px 2px #000;
   }
 
   .status-pips {
     display: flex;
-    justify-content: center;
-    gap: 6px;
-    margin-top: 4px;
-    font-size: 0.6rem;
-    min-height: 1.1em;
+    justify-content: flex-start;
+    gap: 5px;
+    margin-top: 2px;
+    font-size: 0.5rem;
+    min-height: 1em;
   }
 
+  #player-zone .status-pips { justify-content: flex-start; }
+
   .status-pip {
-    padding: 1px 6px;
-    border-radius: 8px;
+    padding: 0 5px;
+    border-radius: 7px;
     border: 1px solid;
   }
   .status-pip.shield { color: var(--shield); border-color: var(--shield); }
@@ -312,22 +349,23 @@
   #log-panel {
     flex: 0 1 auto;
     overflow-y: auto;
-    margin: 4px 12px;
-    padding: 6px 8px;
+    margin: 2px 10px;
+    padding: 3px 7px;
     background: rgba(0,0,0,0.45);
     border: 1px solid var(--border);
     border-radius: 6px;
-    font-size: 0.66rem;
+    font-size: 0.56rem;
     color: var(--text-dim);
-    min-height: 40px;
-    max-height: 92px;
+    min-height: 20px;
+    max-height: 42px;
   }
 
-  #log-panel div { margin-bottom: 2px; }
-  #log-panel .turn-marker { color: var(--gold); font-weight: bold; margin-top: 4px; }
+  #log-panel div { margin-bottom: 1px; }
+  #log-panel .turn-marker { color: var(--gold); font-weight: bold; margin-top: 2px; }
 
   #player-zone {
-    padding: 4px 14px 6px;
+    flex: 0 0 auto;
+    padding: 1px 12px 1px;
   }
 
   #player-row {
@@ -337,23 +375,26 @@
   }
 
   #player-name {
-    font-size: 0.72rem;
+    font-size: 0.62rem;
     color: var(--text-dim);
-    width: 60px;
+    width: 52px;
     flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   #player-faith-bar { flex: 1; }
 
   #energy-pips {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     margin-left: 4px;
   }
 
   .energy-pip {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
     border-radius: 50%;
     background: #221a15;
     border: 1px solid var(--gold);
@@ -361,15 +402,16 @@
   .energy-pip.filled { background: var(--gold); box-shadow: 0 0 5px var(--gold); }
 
   #action-row {
+    flex: 0 0 auto;
     display: flex;
     gap: 6px;
-    padding: 4px 12px;
+    padding: 2px 10px;
   }
 
   .action-btn {
     flex: 1;
-    padding: 7px 4px;
-    font-size: 0.68rem;
+    padding: 5px 4px;
+    font-size: 0.62rem;
     background: var(--panel-2);
     border: 1px solid var(--border);
     color: var(--text);
@@ -385,22 +427,23 @@
   .action-btn:disabled { opacity: 0.35; cursor: default; }
 
   #hand-zone {
+    flex: 0 0 auto;
     position: relative;
     z-index: 2;
     margin-top: auto;
-    padding: 8px 8px 14px;
+    padding: 4px 8px 6px;
     display: flex;
-    gap: 8px;
+    gap: 6px;
     overflow-x: auto;
     background: linear-gradient(0deg, #000 10%, rgba(0,0,0,0) 100%);
   }
 
   .hand-card {
     flex: 0 0 auto;
-    width: 92px;
+    width: 118px;
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 7px;
     overflow: hidden;
     cursor: pointer;
     display: flex;
@@ -408,13 +451,13 @@
     transition: transform 0.12s ease, border-color 0.12s ease;
   }
 
-  .hand-card:active { transform: translateY(-4px); }
+  .hand-card:active { transform: translateY(-3px); }
   .hand-card.unaffordable { opacity: 0.4; cursor: default; }
   .hand-card.corrupted { border-color: var(--corrupt); box-shadow: 0 0 8px rgba(155,79,208,0.5); }
 
   .hand-card img {
     width: 100%;
-    height: 92px;
+    height: 44px;
     object-fit: cover;
     display: block;
     background: #000;
@@ -426,15 +469,15 @@
 
   .hand-card-cost-badge {
     position: absolute;
-    top: 4px;
-    left: 4px;
-    width: 20px;
-    height: 20px;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background: rgba(0,0,0,0.75);
     border: 1px solid var(--gold);
     color: var(--gold-bright);
-    font-size: 0.68rem;
+    font-size: 0.58rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -442,25 +485,31 @@
   }
 
   .hand-card-name {
-    font-size: 0.6rem;
+    font-size: 0.56rem;
     color: var(--gold-bright);
-    padding: 4px 5px 0;
-    line-height: 1.15;
-    min-height: 2.2em;
+    padding: 3px 5px 0;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .hand-card-effect {
-    font-size: 0.53rem;
+    font-size: 0.48rem;
     color: var(--text-dim);
-    padding: 2px 5px 6px;
-    line-height: 1.2;
+    padding: 1px 5px 4px;
+    line-height: 1.15;
     flex: 1;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
   }
 
   .hand-card-wear {
-    font-size: 0.5rem;
+    font-size: 0.46rem;
     color: var(--corrupt);
-    padding: 0 5px 5px;
+    padding: 0 5px 3px;
   }
 
   /* ---------- Modal ---------- */
@@ -478,35 +527,35 @@
 
   #modal {
     width: 100%;
-    max-height: 78%;
+    max-height: 88%;
     background: var(--panel);
     border-top: 2px solid var(--gold);
-    border-radius: 14px 14px 0 0;
-    padding: 14px 14px 20px;
+    border-radius: 12px 12px 0 0;
+    padding: 10px 12px 14px;
     overflow-y: auto;
   }
 
   #modal h2 {
-    margin: 0 0 4px;
-    font-size: 0.95rem;
+    margin: 0 0 3px;
+    font-size: 0.8rem;
     color: var(--gold-bright);
     letter-spacing: 0.04em;
   }
 
   #modal .modal-sub {
-    font-size: 0.68rem;
+    font-size: 0.6rem;
     color: var(--text-dim);
-    margin-bottom: 10px;
+    margin-bottom: 7px;
   }
 
   .modal-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px;
+    gap: 8px;
+    padding: 6px;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 8px;
+    border-radius: 7px;
+    margin-bottom: 6px;
     cursor: pointer;
     background: var(--panel-2);
   }
@@ -514,8 +563,8 @@
   .modal-item:active { transform: scale(0.98); }
 
   .modal-item img {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     object-fit: cover;
     border-radius: 5px;
     flex-shrink: 0;
@@ -523,10 +572,10 @@
   }
 
   .modal-item-text { flex: 1; min-width: 0; }
-  .modal-item-title { font-size: 0.72rem; color: var(--gold-bright); }
-  .modal-item-desc { font-size: 0.62rem; color: var(--text-dim); margin-top: 2px; }
+  .modal-item-title { font-size: 0.64rem; color: var(--gold-bright); }
+  .modal-item-desc { font-size: 0.56rem; color: var(--text-dim); margin-top: 1px; }
 
-  #modal .action-btn { margin-top: 6px; }
+  #modal .action-btn { margin-top: 4px; }
 
   /* ---------- End screen ---------- */
   #end-screen {
@@ -536,24 +585,25 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 30px 20px;
+    padding: 14px 20px;
     background: #000;
+    overflow-y: auto;
   }
 
   #end-title {
-    font-size: 1.8rem;
+    font-size: 1.35rem;
     letter-spacing: 0.08em;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   #end-title.victory { color: var(--gold-bright); text-shadow: 0 0 20px rgba(240,211,138,0.6); }
   #end-title.defeat { color: var(--blood-bright); text-shadow: 0 0 20px rgba(194,59,59,0.6); }
 
   #end-stats {
-    font-size: 0.78rem;
+    font-size: 0.7rem;
     color: var(--text-dim);
-    line-height: 1.8;
-    margin-bottom: 24px;
+    line-height: 1.5;
+    margin-bottom: 12px;
   }
 
   #end-stats b { color: var(--text); }

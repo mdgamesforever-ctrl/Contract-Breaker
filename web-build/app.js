@@ -134,17 +134,17 @@ function renderMapScreen() {
 
   const wrap = document.getElementById('map-svg-wrap');
   const floorCount = map.floors.length;
-  const spacing = 100;
-  const topPad = 50;
-  const bottomPad = 40;
-  const totalHeight = (floorCount - 1) * spacing + topPad + bottomPad;
-  wrap.style.height = totalHeight + 'px';
 
+  // Floors run left -> right, nodes within a floor run top -> bottom, both
+  // as percentages of the available area so the whole run always fits in
+  // one landscape viewport with no scrolling required. Positions are kept
+  // inset from the true edges (6-94% / 14-82%) to leave room for the
+  // topbar above and the shard-banner overlay below.
   const positions = new Map();
   map.floors.forEach((floorNodes, f) => {
-    const y = totalHeight - bottomPad - f * spacing;
+    const x = 6 + ((f + 1) / (floorCount + 1)) * 88;
     floorNodes.forEach((node, i) => {
-      const x = ((i + 1) / (floorNodes.length + 1)) * 100;
+      const y = 14 + ((i + 1) / (floorNodes.length + 1)) * 68;
       positions.set(node.id, { x, y });
     });
   });
@@ -157,7 +157,7 @@ function renderMapScreen() {
       const line = document.createElement('div');
       line.style.position = 'absolute';
       line.style.left = from.x + '%';
-      line.style.top = from.y + 'px';
+      line.style.top = from.y + '%';
       line.style.width = '2px';
       line.style.height = '2px';
       line.style.background = 'transparent';
@@ -167,9 +167,9 @@ function renderMapScreen() {
       requestAnimationFrame(() => {
         const wrapRect = wrap.getBoundingClientRect();
         const x1 = (from.x / 100) * wrapRect.width;
-        const y1 = from.y;
+        const y1 = (from.y / 100) * wrapRect.height;
         const x2 = (to.x / 100) * wrapRect.width;
-        const y2 = to.y;
+        const y2 = (to.y / 100) * wrapRect.height;
         const dx = x2 - x1;
         const dy = y2 - y1;
         const length = Math.hypot(dx, dy);
@@ -194,7 +194,7 @@ function renderMapScreen() {
     if (available.has(node.id)) btn.classList.add('available');
     if (run.currentNode && run.currentNode.id === node.id) btn.classList.add('current');
     btn.style.left = pos.x + '%';
-    btn.style.top = pos.y + 'px';
+    btn.style.top = pos.y + '%';
     btn.textContent = NODE_ICON[node.type];
     btn.title = node.type;
     if (available.has(node.id)) {
@@ -205,19 +205,12 @@ function renderMapScreen() {
     const label = document.createElement('div');
     label.className = 'map-node-label';
     label.style.left = pos.x + '%';
-    label.style.top = pos.y + 28 + 'px';
+    label.style.top = `calc(${pos.y}% + 24px)`;
     label.style.position = 'absolute';
     label.style.transform = 'translateX(-50%)';
     label.textContent = node.type;
     wrap.appendChild(label);
   }
-
-  // Auto-scroll so the currently-reachable nodes are in view.
-  requestAnimationFrame(() => {
-    const scroller = document.getElementById('map-scroll');
-    const targetY = totalHeight - bottomPad - (run.currentNode ? run.currentNode.floor : 0) * spacing;
-    scroller.scrollTop = Math.max(0, totalHeight - targetY - 200);
-  });
 }
 
 function onNodeClick(nodeId) {
@@ -269,14 +262,18 @@ function renderCombatScreen() {
     <div id="combat-screen" style="background-image:url('${bg}')">
       <div class="combat-layer">
         <div id="enemy-zone">
-          <img id="enemy-portrait" src="${combat.enemy.art || ''}" alt="${combat.enemy.name}" />
-          <div id="enemy-name">${combat.enemy.name}</div>
-          <div id="enemy-intent"></div>
-          <div class="bar bar-faith" style="width:160px">
-            <div class="bar-fill" id="enemy-faith-fill"></div>
-            <div class="bar-label" id="enemy-faith-label"></div>
+          <div id="enemy-row">
+            <img id="enemy-portrait" src="${combat.enemy.art || ''}" alt="${combat.enemy.name}" />
+            <div id="enemy-info">
+              <div id="enemy-name">${combat.enemy.name}</div>
+              <div id="enemy-intent"></div>
+              <div class="bar bar-faith" id="enemy-faith-bar">
+                <div class="bar-fill" id="enemy-faith-fill"></div>
+                <div class="bar-label" id="enemy-faith-label"></div>
+              </div>
+              <div class="status-pips" id="enemy-status"></div>
+            </div>
           </div>
-          <div class="status-pips" id="enemy-status"></div>
         </div>
 
         <div id="log-panel"></div>
