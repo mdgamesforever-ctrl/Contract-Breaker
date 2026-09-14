@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="420" viewBox="0 0 300 420">
+  <rect width="300" height="420" fill="#141c14" />
+  <rect x="6" y="6" width="288" height="408" fill="none" stroke="#d4af6a" stroke-width="3" stroke-dasharray="10 6" />
+  <line x1="0" y1="0" x2="300" y2="420" stroke="#d4af6a" stroke-width="1" opacity="0.25" />
+  <line x1="300" y1="0" x2="0" y2="420" stroke="#d4af6a" stroke-width="1" opacity="0.25" />
+  <text x="150" y="200" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="bold" fill="#d4af6a"><tspan x="150" y="200">The Last Ember</tspan></text>
+  <text x="150" y="246" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#d4af6a" opacity="0.85">Expansion Card</text>
+  <text x="150" y="398" text-anchor="middle" font-family="monospace" font-size="15" letter-spacing="2" fill="#ffffff">PLACEHOLDER ART</text>
+</svg>

@@ -1,8 +1,10 @@
 import { Card } from './Card.js';
+import { createExpansionCards } from './expansionCards.js';
 
-// The 16 unique starter cards from the art manifest. Cards 16-18 and 20 in
-// the manifest are visual variants of an existing card rather than separate
-// mechanical cards -- see the design note at the bottom of this file for why.
+// The original 16 unique starter cards from the art manifest, plus (further
+// down this file) 4 cards repurposed from what used to be alt-art variants,
+// plus 10 more expansion cards in expansionCards.js -- ~30 unique mechanical
+// cards in total. See createStarterDeck() at the bottom for the full pool.
 
 export function createSeveredVow({ power = 6 } = {}) {
   return new Card({
@@ -41,7 +43,6 @@ export function createLastScreamOfTheGod({ power = 18, faithCost = 5 } = {}) {
     power,
     type: 'attack',
     art: 'assets/cards/card_03_last_scream_of_the_god.png',
-    corruptedArt: 'assets/cards/card_20_last_scream_of_the_god_variant.png',
     effect: ({ self, enemy, card }) => {
       self.takeDamage(faithCost);
       enemy.takeDamage(card.power);
@@ -202,7 +203,6 @@ export function createTitanOfTheDeep({ power = 15 } = {}) {
     power,
     type: 'attack',
     art: 'assets/cards/card_14_titan_of_the_deep.png',
-    corruptedArt: 'assets/cards/card_18_titan_of_the_deep_variant.png',
     effect: ({ enemy, card }) => {
       enemy.takeDamage(card.power);
       card.corrupt();
@@ -218,7 +218,6 @@ export function createRiteOfTheBleedingAltar({ power = 11, faithCost = 3 } = {})
     power,
     type: 'attack',
     art: 'assets/cards/card_15_rite_of_the_bleeding_altar.png',
-    corruptedArt: 'assets/cards/card_16_blood_communion_variant.png',
     effect: ({ self, enemy, card }) => {
       self.takeDamage(faithCost);
       enemy.takeDamage(card.power);
@@ -238,7 +237,89 @@ export function createVacantThrone() {
   });
 }
 
-// Returns one copy of each of the 16 starter cards.
+// ---------------------------------------------------------------------
+// The 4 manifest "variant" art files (16-18, 20), now standalone cards.
+//
+// Earlier these were folded in as `corruptedArt` for Rite of the Bleeding
+// Altar (#15, x2), Titan of the Deep (#14), and Last Scream of the God (#3).
+// With the card pool expanding well past a 16-card toolkit, they're more
+// valuable as four fully independent cards with their own mechanics than as
+// alt-art for cards that already have plenty of identity; their old base
+// cards fall back to their normal (non-corrupted) art when corrupted, which
+// is fine since the purple corrupted-glow border on the card frame already
+// signals corruption on its own (see .hand-card.corrupted in index.html).
+// ---------------------------------------------------------------------
+
+export function createBloodCommunion({ power = 6, healAmount = 3 } = {}) {
+  return new Card({
+    id: 'blood-communion',
+    name: 'Blood Communion',
+    cost: 2,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_16_blood_communion_variant.png',
+    effect: ({ self, enemy, card }) => {
+      enemy.takeDamage(card.power);
+      self.heal(healAmount);
+    },
+  });
+}
+
+export function createBloodRite({ power = 5, burnBonus = 4 } = {}) {
+  return new Card({
+    id: 'blood-rite',
+    name: 'Blood Rite',
+    cost: 1,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_17_blood_rite_variant.png',
+    effect: ({ enemy, card }) => {
+      enemy.takeDamage(card.power + (enemy.burn > 0 ? burnBonus : 0));
+    },
+  });
+}
+
+export function createTitansWake({ power = 12 } = {}) {
+  return new Card({
+    id: 'titans-wake',
+    name: "Titan's Wake",
+    cost: 3,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_18_titan_of_the_deep_variant.png',
+    effect: ({ enemy, deck, card }) => {
+      enemy.takeDamage(card.power);
+      const others = deck.hand.filter((c) => c !== card);
+      if (others.length > 0) {
+        const target = others[Math.floor(Math.random() * others.length)];
+        target.applyWear(1);
+      }
+    },
+  });
+}
+
+export function createEchoOfTheGod({ power = 5 } = {}) {
+  return new Card({
+    id: 'echo-of-the-god',
+    name: 'Echo of the God',
+    cost: 1,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_20_last_scream_of_the_god_variant.png',
+    effect: ({ enemy, deck, card }) => {
+      enemy.takeDamage(card.power);
+      deck.draw(1);
+    },
+  });
+}
+
+// Returns one copy of every unique mechanical card in the game: the 16
+// original starter cards, the 4 cards above (repurposed from what used to
+// be alt-art variants), and the 10 further expansion cards in
+// expansionCards.js. Despite the name (kept for backward compatibility with
+// existing call sites), this is the *entire* card pool, not a subset --
+// there's no separate drafting/reward step, so every card in the game is in
+// play from turn one of every run.
 export function createStarterDeck() {
   return [
     createSeveredVow(),
@@ -257,21 +338,10 @@ export function createStarterDeck() {
     createTitanOfTheDeep(),
     createRiteOfTheBleedingAltar(),
     createVacantThrone(),
+    createBloodCommunion(),
+    createBloodRite(),
+    createTitansWake(),
+    createEchoOfTheGod(),
+    ...createExpansionCards(),
   ];
 }
-
-// Design note on the manifest's "variant" art files (16-18, 20):
-//
-// card_16_blood_communion_variant.png and card_17_blood_rite_variant.png
-// are alt art for Rite of the Bleeding Altar (#15); card_18 is alt art for
-// Titan of the Deep (#14); card_20 is alt art for Last Scream of the God
-// (#3). All four are wired as `corruptedArt` on their base card (shown once
-// the card corrupts) rather than as four additional playable cards. Keeping
-// them as separate cards would have produced near-duplicate effects with
-// different flavor art -- diluting the 20-slot pool without adding
-// mechanical depth. As alt/corrupted-state art they instead reinforce the
-// decay system that's already central to the game. 16 unique mechanical
-// cards is still a healthy starter-deck size, so this didn't leave the pool
-// short on variety. (card_17 "Blood Rite" is the second variant for #15;
-// since a card only has one `corruptedArt` slot, it's kept in the assets
-// folder as a second alt-art option for future use but isn't wired up yet.)

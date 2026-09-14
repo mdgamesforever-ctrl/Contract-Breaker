@@ -4,7 +4,7 @@ import { BossCombat } from './game/BossCombat.js';
 import { Deck } from './cards/Deck.js';
 import { createStarterDeck } from './cards/starterCards.js';
 import { ENEMY_ROSTER } from './game/enemies.js';
-import { createDyingGod } from './game/bossRoster.js';
+import { createDyingGod, createBrokenAcolyte } from './game/bossRoster.js';
 import { generateRunMap, NODE_TYPES } from './run/RunMap.js';
 import { Run } from './run/Run.js';
 import { NarrativeEngine } from './narrative/NarrativeEngine.js';
@@ -52,11 +52,12 @@ function main() {
   const player = new Vessel({ name: 'The Vessel', maxFaith: 50 });
   const deck = new Deck(createStarterDeck());
   const map = generateRunMap({
-    floorCount: 5,
-    nodesPerFloor: 3,
-    restChance: 0.25,
+    floorCount: 6,
+    nodesPerFloor: 4,
+    restChance: 0.22,
     enemyPool: ENEMY_ROSTER,
     bossFactory: createDyingGod,
+    miniBossFactory: createBrokenAcolyte,
   });
   const run = new Run({ map, player, log: console.log });
   const narrative = new NarrativeEngine({ shards: createShardPool(), threshold: 3, log: console.log });

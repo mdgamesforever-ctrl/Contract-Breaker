@@ -14,6 +14,7 @@ const FILES = [
   'src/utils/shuffle.js',
   'src/cards/Card.js',
   'src/cards/Deck.js',
+  'src/cards/expansionCards.js',
   'src/cards/starterCards.js',
   'src/game/Vessel.js',
   'src/game/Enemy.js',

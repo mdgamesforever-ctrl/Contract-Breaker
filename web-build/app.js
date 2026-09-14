@@ -25,6 +25,20 @@ const CARD_BLURBS = {
   'titan-of-the-deep': 'A devastating blow -- but it corrupts this card at once.',
   'rite-of-the-bleeding-altar': 'Drains your own Faith to deal heavy damage.',
   'vacant-throne': 'Draw a card, scrying what comes next.',
+  'blood-communion': 'Deals damage and heals a little Faith in return.',
+  'blood-rite': 'Deals bonus damage if the enemy is already burning.',
+  'titans-wake': 'A heavy blow that also wears down another card in hand.',
+  'echo-of-the-god': 'A cheap strike that also draws a card.',
+  'whispering-ash': 'Draws two cards.',
+  'gravebound-oath': 'Deals double damage to a badly wounded enemy.',
+  'ashen-ward': 'Raises a large shield.',
+  'pact-of-embers': 'Applies a burn to the enemy.',
+  'unbroken-choir': 'Restores a flat amount of Faith.',
+  'faithbreakers-gambit': 'Free to play, but costs you Faith when cast.',
+  'cinder-wake': 'Deals more damage for every card you have sacrificed.',
+  'hollow-chant': 'Cleanses some wear from a decaying card.',
+  'bound-in-silence': 'A reckless strike that wears itself down twice as fast.',
+  'last-ember': 'Deals damage and heals Faith equal to your discard pile.',
 };
 
 function cardBlurb(card) {
@@ -65,12 +79,24 @@ function enemyIntent(enemy) {
       return enemy.tethered
         ? `Tethered -- reforms unless the tether is Anchored away`
         : `Tether severed -- it can finally be broken`;
+    case 'GildedLiar':
+      return `Shields itself, then strikes for ~${enemy.damage}`;
+    case 'Sunderer':
+      return `Strips your shield, then strikes for ~${enemy.damage}`;
+    case 'Famine':
+      return `Hits harder the lower your Faith runs`;
+    case 'Verdict':
+      return `Strikes for ~${enemy.damage} and mends itself`;
+    case 'ChorusUnbound':
+      return `Strikes and unravels a card from your draw pile`;
+    case 'BrokenAcolyte':
+      return `Corrupts a memory and heals off your decay`;
     default:
       return `Strikes for ~${enemy.damage}`;
   }
 }
 
-const NODE_ICON = { fight: '⚔️', rest: '🕯️', boss: '👑' };
+const NODE_ICON = { fight: '⚔️', rest: '🕯️', boss: '👑', miniboss: '💀' };
 
 // ---------------------------------------------------------------------
 // Global state
@@ -84,6 +110,7 @@ const G = {
   combat: null,
   lastShardText: null,
   lastTwistText: null,
+  currentScreen: null,
 };
 
 const screenEl = document.getElementById('screen');
@@ -104,6 +131,59 @@ modalOverlay.addEventListener('click', (e) => {
 });
 
 // ---------------------------------------------------------------------
+// Audio: lazily unlocked on the first tap/click anywhere (browsers block
+// audio before a user gesture), mute toggle available on every screen.
+// ---------------------------------------------------------------------
+const audioToggleBtn = document.getElementById('audio-toggle');
+
+const hasAudioManager = typeof AudioManager !== 'undefined';
+
+function updateAudioToggleLabel() {
+  const muted = hasAudioManager && AudioManager.isMuted();
+  audioToggleBtn.textContent = muted ? '🔇' : '🔊';
+}
+
+if (hasAudioManager) {
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      AudioManager.init();
+      if (G.currentScreen) AudioManager.playMusic(G.currentScreen);
+    },
+    { once: true }
+  );
+  audioToggleBtn.addEventListener('click', () => {
+    AudioManager.toggleMuted();
+    updateAudioToggleLabel();
+  });
+  updateAudioToggleLabel();
+} else {
+  audioToggleBtn.style.display = 'none';
+}
+
+function playScreenMusic(name) {
+  G.currentScreen = name;
+  if (hasAudioManager) AudioManager.playMusic(name);
+}
+
+function playSfx(name) {
+  if (hasAudioManager) AudioManager.sfx(name);
+}
+
+// Appends a floating "+N"/"-N" number inside `containerId` (which must be
+// position:relative) that animates upward and fades, then removes itself.
+function showFloatingNumber(containerId, delta) {
+  if (!delta) return;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = 'floating-number ' + (delta < 0 ? 'dmg' : 'heal');
+  el.textContent = (delta > 0 ? '+' : '') + delta;
+  container.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
+// ---------------------------------------------------------------------
 // Title screen
 // ---------------------------------------------------------------------
 function renderTitleScreen() {
@@ -115,6 +195,7 @@ function renderTitleScreen() {
     </div>
   `;
   document.getElementById('begin-btn').addEventListener('click', newRun);
+  playScreenMusic('title');
 }
 
 // ---------------------------------------------------------------------
@@ -124,11 +205,12 @@ function newRun() {
   G.player = new Vessel({ name: 'The Vessel', maxFaith: 50, energyPerTurn: 3 });
   G.deck = new Deck(createStarterDeck());
   G.map = generateRunMap({
-    floorCount: 5,
-    nodesPerFloor: 3,
-    restChance: 0.25,
+    floorCount: 6,
+    nodesPerFloor: 4,
+    restChance: 0.22,
     enemyPool: ENEMY_ROSTER,
     bossFactory: createDyingGod,
+    miniBossFactory: createBrokenAcolyte,
   });
   G.run = new Run({ map: G.map, player: G.player, log: () => {} });
   G.narrative = new NarrativeEngine({ shards: createShardPool(), threshold: 3, log: () => {} });
@@ -159,6 +241,7 @@ function renderMapScreen() {
       </div>
     </div>
   `;
+  playScreenMusic('map');
 
   const wrap = document.getElementById('map-svg-wrap');
   const floorCount = map.floors.length;
@@ -218,6 +301,7 @@ function renderMapScreen() {
     const btn = document.createElement('div');
     btn.className = 'map-node';
     if (node.type === 'boss') btn.classList.add('boss');
+    if (node.type === 'miniboss') btn.classList.add('miniboss');
     if (visited.has(node.id)) btn.classList.add('visited');
     if (available.has(node.id)) btn.classList.add('available');
     if (run.currentNode && run.currentNode.id === node.id) btn.classList.add('current');
@@ -283,8 +367,8 @@ function combatLog(msg) {
 
 function renderCombatScreen() {
   const combat = G.combat;
-  const isBoss = combat.enemy.constructor.name === 'MemoryShardBoss';
-  const bg = isBoss ? BACKGROUNDS.bossArena : BACKGROUNDS.nodeTransition;
+  const nodeType = G.run.currentNode ? G.run.currentNode.type : 'fight';
+  const bg = Run.backgroundForNode(G.run.currentNode);
 
   screenEl.innerHTML = `
     <div id="combat-screen" style="background-image:url('${bg}')">
@@ -335,6 +419,7 @@ function renderCombatScreen() {
   }
   panel.scrollTop = panel.scrollHeight;
 
+  playScreenMusic(nodeType === 'boss' || nodeType === 'miniboss' ? 'boss' : 'combat');
   refreshCombatUI();
 }
 
@@ -391,8 +476,14 @@ function renderActionRow() {
     endBtn.className = 'action-btn primary';
     endBtn.textContent = 'End Turn';
     endBtn.addEventListener('click', () => {
+      const beforePlayerFaith = G.player.faith;
       G.combat.endPlayerTurn();
       if (!G.combat.over) G.combat.startPlayerTurn();
+      const playerDelta = G.player.faith - beforePlayerFaith;
+      if (playerDelta !== 0) {
+        showFloatingNumber('player-zone', playerDelta);
+        playSfx('damage');
+      }
       refreshCombatUI();
       const panel = document.getElementById('log-panel');
       if (panel) panel.scrollTop = panel.scrollHeight;
@@ -437,7 +528,10 @@ function renderHand() {
     `;
 
     if (card.cost <= G.player.energy) {
-      el.addEventListener('click', () => attemptPlayCard(index));
+      el.addEventListener('click', () => {
+        el.classList.add('playing');
+        setTimeout(() => attemptPlayCard(index), 190);
+      });
     }
     zone.appendChild(el);
   });
@@ -469,11 +563,26 @@ function attemptPlayCard(index) {
 }
 
 function playCardNow(index, options) {
+  const enemy = G.combat.enemy;
+  const player = G.player;
+  const beforeEnemyFaith = enemy.faith;
+  const beforePlayerFaith = player.faith;
+  let played = false;
   try {
     G.combat.playCard(index, options);
+    played = true;
   } catch (err) {
     combatLog(`(${err.message})`);
   }
+
+  if (played) {
+    const enemyDelta = enemy.faith - beforeEnemyFaith;
+    const playerDelta = player.faith - beforePlayerFaith;
+    if (enemyDelta !== 0) showFloatingNumber('enemy-zone', enemyDelta);
+    if (playerDelta !== 0) showFloatingNumber('player-zone', playerDelta);
+    playSfx(enemyDelta < 0 || playerDelta < 0 ? 'damage' : 'cardPlay');
+  }
+
   refreshCombatUI();
   const panel = document.getElementById('log-panel');
   if (panel) panel.scrollTop = panel.scrollHeight;
@@ -542,6 +651,7 @@ function openAnchorStepTwo(sacrificeIndex) {
       closeModal();
       try {
         G.combat.anchor(sacrificeIndex, target);
+        playSfx('anchor');
       } catch (err) {
         combatLog(`(${err.message})`);
       }
@@ -613,6 +723,7 @@ function openGraftStepTwo(ability) {
       closeModal();
       try {
         G.combat.graft(ability, target);
+        playSfx('graft');
       } catch (err) {
         combatLog(`(${err.message})`);
       }
@@ -627,6 +738,7 @@ function openGraftStepTwo(ability) {
 function finishCombat() {
   refreshCombatUI();
   const victory = G.combat.result === 'win';
+  playSfx(victory ? 'victory' : 'defeat');
   G.run.completeCurrentNode({ victory });
   G.combat = null;
   if (G.run.over) renderEndScreen();
@@ -654,6 +766,7 @@ function renderEndScreen() {
     </div>
   `;
   document.getElementById('restart-btn').addEventListener('click', newRun);
+  playScreenMusic('title');
 }
 
 // ---------------------------------------------------------------------

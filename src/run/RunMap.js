@@ -4,6 +4,7 @@ export const NODE_TYPES = Object.freeze({
   FIGHT: 'fight',
   REST: 'rest',
   BOSS: 'boss',
+  MINIBOSS: 'miniboss',
 });
 
 // A branching, floor-by-floor node map. Every floor's nodes connect forward
@@ -35,8 +36,15 @@ export class RunMap {
 // Generates a RunMap. `rng` is injectable for deterministic tests.
 // `enemyPool` (factory functions) is assigned randomly to fight nodes so
 // each node knows which enemy it holds; `bossFactory` is assigned to the
-// single boss node. Both are optional -- callers that don't pass them just
-// get a map without pre-assigned encounters.
+// single (final) boss node. Both are optional -- callers that don't pass
+// them just get a map without pre-assigned encounters.
+//
+// `miniBossFactory`, if given, marks exactly one node on a middle floor
+// (the first node of `miniBossFloor`, or the middle non-boss floor if
+// omitted) as a NODE_TYPES.MINIBOSS node instead of a normal roll, holding
+// that factory. Omitting `miniBossFactory` reproduces the exact map shape
+// (and RNG consumption) from before mini-bosses existed, so every existing
+// caller is unaffected.
 export function generateRunMap({
   floorCount = 5,
   nodesPerFloor = 3,
@@ -44,6 +52,8 @@ export function generateRunMap({
   rng = Math.random,
   enemyPool = [],
   bossFactory = null,
+  miniBossFactory = null,
+  miniBossFloor = null,
 } = {}) {
   if (floorCount < 2) {
     throw new Error('A run map needs at least 2 floors (one fight floor and a boss floor)');
@@ -52,10 +62,25 @@ export function generateRunMap({
     throw new Error('Each non-boss floor needs at least one node');
   }
 
+  const nonBossFloorCount = floorCount - 1;
+  const resolvedMiniBossFloor = miniBossFactory
+    ? miniBossFloor ?? Math.floor(nonBossFloorCount / 2)
+    : null;
+
   const floors = [];
   for (let f = 0; f < floorCount - 1; f++) {
     const nodes = [];
     for (let i = 0; i < nodesPerFloor; i++) {
+      if (f === resolvedMiniBossFloor && i === 0) {
+        nodes.push({
+          id: `f${f}n${i}`,
+          floor: f,
+          type: NODE_TYPES.MINIBOSS,
+          connections: [],
+          enemyFactory: miniBossFactory,
+        });
+        continue;
+      }
       const type = rng() < restChance ? NODE_TYPES.REST : NODE_TYPES.FIGHT;
       const node = { id: `f${f}n${i}`, floor: f, type, connections: [] };
       if (type === NODE_TYPES.FIGHT && enemyPool.length > 0) {

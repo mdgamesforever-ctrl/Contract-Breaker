@@ -31,7 +31,7 @@ export class Run {
     if (!node) throw new Error(`Node ${nodeId} is not reachable from here`);
     this.currentNode = node;
     this.visited.push(node.id);
-    const background = node.type === NODE_TYPES.BOSS ? BACKGROUNDS.bossArena : BACKGROUNDS.nodeTransition;
+    const background = Run.backgroundForNode(node);
     this.log(`[Background: ${background}]`);
     this.log(`-- Entering ${node.type} node ${node.id} (floor ${node.floor}) --`);
     return node;
@@ -54,6 +54,20 @@ export class Run {
       this.over = true;
       this.result = 'victory';
       this.log('The final memory shard shatters. The run is complete.');
+    }
+  }
+
+  // Background art for a given node, by node type/kind.
+  static backgroundForNode(node) {
+    switch (node.type) {
+      case NODE_TYPES.BOSS:
+        return BACKGROUNDS.bossArena;
+      case NODE_TYPES.MINIBOSS:
+        return BACKGROUNDS.miniBossArena;
+      case NODE_TYPES.REST:
+        return BACKGROUNDS.restSanctum;
+      default:
+        return BACKGROUNDS.nodeTransition;
     }
   }
 

@@ -107,6 +107,28 @@ test('Run rejects entering a node that is not currently reachable', () => {
   assert.throws(() => run.enterNode(map.bossNode.id), /not reachable/);
 });
 
+test('generateRunMap places exactly one MINIBOSS node when miniBossFactory is given', () => {
+  const miniBossFactory = () => ({ mini: true });
+  const map = generateRunMap({
+    floorCount: 6,
+    nodesPerFloor: 3,
+    restChance: 0.25,
+    rng: sequenceRng([0.1, 0.9, 0.4, 0.6, 0.2, 0.8, 0.3, 0.5, 0.7]),
+    miniBossFactory,
+  });
+
+  const miniBossNodes = map.allNodes().filter((n) => n.type === NODE_TYPES.MINIBOSS);
+  assert.equal(miniBossNodes.length, 1, 'exactly one node should be a mini-boss node');
+  assert.equal(miniBossNodes[0].enemyFactory, miniBossFactory);
+  assert.notEqual(miniBossNodes[0].floor, map.floors.length - 1, 'the mini-boss should not be on the final (true boss) floor');
+});
+
+test('generateRunMap never produces a MINIBOSS node when miniBossFactory is omitted', () => {
+  const map = generateRunMap({ floorCount: 5, nodesPerFloor: 3, rng: sequenceRng([0.1, 0.9, 0.4]) });
+  const miniBossNodes = map.allNodes().filter((n) => n.type === NODE_TYPES.MINIBOSS);
+  assert.equal(miniBossNodes.length, 0);
+});
+
 test('restAtCurrentNode heals the player and completes the node', () => {
   const map = generateRunMap({ floorCount: 2, nodesPerFloor: 1, restChance: 1, rng: () => 0 });
   const player = new Vessel({ name: 'Player', maxFaith: 40 });

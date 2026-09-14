@@ -130,6 +130,61 @@
     min-height: 0;
   }
 
+  /* Every screen render replaces #screen's single child with a brand new
+     element, so a plain CSS animation on it replays automatically on every
+     navigation (title -> map -> combat -> end, etc) with no JS timing code
+     needed. */
+  @keyframes screenFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  #screen > * {
+    animation: screenFadeIn 0.32s ease;
+  }
+
+  /* Small persistent audio control -- not branding/header content, just a
+     utility toggle, so it doesn't reintroduce a header bar. */
+  #audio-toggle {
+    position: absolute;
+    top: max(env(safe-area-inset-top), 8px);
+    right: max(env(safe-area-inset-right), 8px);
+    z-index: 30;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+  }
+  #audio-toggle:active { transform: scale(0.9); }
+
+  /* Floating damage/heal number pop-ups. Appended near a faith bar and
+     removed once the animation finishes (see showFloatingNumber() in
+     app.js). */
+  @keyframes floatUpFade {
+    from { opacity: 1; transform: translate(-50%, 0); }
+    to { opacity: 0; transform: translate(-50%, -30px); }
+  }
+  .floating-number {
+    position: absolute;
+    left: 50%;
+    top: -4px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    text-shadow: 0 1px 3px #000;
+    pointer-events: none;
+    z-index: 10;
+    animation: floatUpFade 0.9s ease forwards;
+  }
+  .floating-number.dmg { color: var(--blood-bright); }
+  .floating-number.heal { color: #7be88a; }
+
   /* ---------- Map screen ----------
      Landscape-native: floors run left -> right, nodes within a floor run
      top -> bottom, all positioned by percentage so the whole run fits in
@@ -209,6 +264,23 @@
     font-size: 1.4rem;
   }
 
+  .map-node.miniboss {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
+    border-color: var(--corrupt);
+  }
+
+  .map-node.miniboss.available {
+    box-shadow: 0 0 16px rgba(155,79,208,0.6);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .map-node.available:hover {
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+  }
+
   .map-node-label {
     position: absolute;
     top: 100%;
@@ -285,6 +357,7 @@
   #enemy-zone {
     flex: 0 0 auto;
     padding: 6px 12px 3px;
+    position: relative;
   }
 
   #enemy-row {
@@ -397,6 +470,7 @@
   #player-zone {
     flex: 0 0 auto;
     padding: 3px 12px 3px;
+    position: relative;
   }
 
   #player-row {
@@ -457,6 +531,13 @@
   .action-btn.danger { border-color: var(--blood-bright); color: #ff9d9d; }
   .action-btn:disabled { opacity: 0.35; cursor: default; }
 
+  @media (hover: hover) and (pointer: fine) {
+    .action-btn:not(:disabled):hover {
+      border-color: var(--gold);
+      color: var(--gold-bright);
+    }
+  }
+
   #hand-zone {
     flex: 0 0 auto;
     position: relative;
@@ -485,6 +566,26 @@
   .hand-card:active { transform: translateY(-3px); }
   .hand-card.unaffordable { opacity: 0.4; cursor: default; }
   .hand-card.corrupted { border-color: var(--corrupt); box-shadow: 0 0 8px rgba(155,79,208,0.5); }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hand-card:not(.unaffordable):hover {
+      transform: translateY(-4px);
+      border-color: var(--gold);
+    }
+  }
+
+  /* Brief "cast" animation played on click, before the card is actually
+     removed by the next combat re-render (see attemptPlayCard() in app.js,
+     which delays the real play by this animation's duration). */
+  @keyframes cardPlayed {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    60% { transform: translateY(-14px) scale(1.06); opacity: 1; }
+    100% { transform: translateY(-30px) scale(0.85); opacity: 0; }
+  }
+  .hand-card.playing {
+    animation: cardPlayed 0.2s ease forwards;
+    pointer-events: none;
+  }
 
   .hand-card img {
     width: 100%;
@@ -652,6 +753,7 @@
 </head>
 <body>
   <div id="app">
+    <button id="audio-toggle" type="button" aria-label="Toggle sound">🔊</button>
     <div id="screen"></div>
   </div>
 
@@ -660,6 +762,7 @@
   </div>
 
   <script src="engine.bundle.js"></script>
+  <script src="audio.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

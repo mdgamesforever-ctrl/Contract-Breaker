@@ -59,3 +59,69 @@ export const beckoningChorus = {
     };
   },
 };
+
+// ---- Abilities offered by the 5 expansion enemies (src/game/enemies.js) ----
+
+export const gildedWard = {
+  id: 'gilded-ward',
+  name: 'Gilded Ward',
+  description: "Permanently increases the card's raw power by 20%.",
+  apply: (card) => {
+    card.basePower = Math.round(card.basePower * 1.2);
+    if (!card.corrupted) card.power = card.basePower;
+  },
+};
+
+export const sunderersEdge = {
+  id: 'sunderers-edge',
+  name: "Sunderer's Edge",
+  description: "Wraps the card's effect to also strip 3 shield from the enemy.",
+  apply: (card) => {
+    const originalEffect = card.effect;
+    card.effect = (ctx) => {
+      originalEffect(ctx);
+      if (ctx.enemy) ctx.enemy.shield = Math.max(0, ctx.enemy.shield - 3);
+    };
+  },
+};
+
+export const famishedGrasp = {
+  id: 'famished-grasp',
+  name: 'Famished Grasp',
+  description: "Wraps the card's effect to also deal 1 bonus damage per corrupted card in your deck.",
+  apply: (card) => {
+    const originalEffect = card.effect;
+    card.effect = (ctx) => {
+      originalEffect(ctx);
+      const corruptedCount = ctx.deck ? ctx.deck.allCards().filter((c) => c.corrupted).length : 0;
+      if (corruptedCount > 0 && ctx.enemy) ctx.enemy.takeDamage(corruptedCount);
+    };
+  },
+};
+
+export const verdictsMercy = {
+  id: 'verdicts-mercy',
+  name: "Verdict's Mercy",
+  description: "Wraps the card's effect to also heal 3 Faith when played below half Faith.",
+  apply: (card) => {
+    const originalEffect = card.effect;
+    card.effect = (ctx) => {
+      originalEffect(ctx);
+      if (ctx.self && ctx.self.faith <= ctx.self.maxFaith * 0.5) ctx.self.heal(3);
+    };
+  },
+};
+
+export const unravelersMark = {
+  id: 'unravelers-mark',
+  name: "Unraveler's Mark",
+  description: 'Permanently adds 1 raw power and reduces cost by 1 (minimum 0).',
+  apply: (card) => {
+    card.basePower += 1;
+    card.baseCost = Math.max(0, card.baseCost - 1);
+    if (!card.corrupted) {
+      card.power = card.basePower;
+      card.cost = card.baseCost;
+    }
+  },
+};

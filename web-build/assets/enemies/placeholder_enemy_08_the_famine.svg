@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <rect width="320" height="320" fill="#2a0f1f" />
+  <rect x="6" y="6" width="308" height="308" fill="none" stroke="#9b4fd0" stroke-width="3" stroke-dasharray="10 6" />
+  <line x1="0" y1="0" x2="320" y2="320" stroke="#9b4fd0" stroke-width="1" opacity="0.25" />
+  <line x1="320" y1="0" x2="0" y2="320" stroke="#9b4fd0" stroke-width="1" opacity="0.25" />
+  <text x="160" y="150" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="bold" fill="#9b4fd0"><tspan x="160" y="150">The Famine</tspan></text>
+  <text x="160" y="196" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#9b4fd0" opacity="0.85">Expansion Enemy</text>
+  <text x="160" y="298" text-anchor="middle" font-family="monospace" font-size="15" letter-spacing="2" fill="#ffffff">PLACEHOLDER ART</text>
+</svg>

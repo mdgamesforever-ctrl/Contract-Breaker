@@ -216,10 +216,171 @@ class Deck {
 }
 
 
+// ---- src/cards/expansionCards.js (bundled, import/export stripped) ----
+// 10 further expansion cards, filling out the pool to ~30 unique mechanical
+// cards alongside the 16 originals and the 4 repurposed variants in
+// starterCards.js. None of these have real generated art yet -- each uses a
+// placeholder SVG (solid color + name + "PLACEHOLDER ART" label, generated
+// by scripts/generate-placeholder-art.mjs) documented in ASSET_TODO.md.
+
+function createWhisperingAsh() {
+  return new Card({
+    id: 'whispering-ash',
+    name: 'Whispering Ash',
+    cost: 1,
+    power: 0,
+    type: 'skill',
+    art: 'assets/cards/placeholder_card_21_whispering_ash.svg',
+    effect: ({ deck }) => deck.draw(2),
+  });
+}
+
+function createGraveboundOath({ power = 10, executeThreshold = 0.25 } = {}) {
+  return new Card({
+    id: 'gravebound-oath',
+    name: 'Gravebound Oath',
+    cost: 2,
+    power,
+    type: 'attack',
+    art: 'assets/cards/placeholder_card_22_gravebound_oath.svg',
+    effect: ({ enemy, card }) => {
+      const executing = enemy.faith <= enemy.maxFaith * executeThreshold;
+      enemy.takeDamage(executing ? card.power * 2 : card.power);
+    },
+  });
+}
+
+function createAshenWard({ power = 10 } = {}) {
+  return new Card({
+    id: 'ashen-ward',
+    name: 'Ashen Ward',
+    cost: 2,
+    power,
+    type: 'skill',
+    art: 'assets/cards/placeholder_card_23_ashen_ward.svg',
+    effect: ({ self, card }) => self.addShield(card.power),
+  });
+}
+
+function createPactOfEmbers({ power = 3 } = {}) {
+  return new Card({
+    id: 'pact-of-embers',
+    name: 'Pact of Embers',
+    cost: 1,
+    power,
+    type: 'attack',
+    art: 'assets/cards/placeholder_card_24_pact_of_embers.svg',
+    effect: ({ enemy, card }) => enemy.applyBurn(card.power),
+  });
+}
+
+function createUnbrokenChoir({ healAmount = 10 } = {}) {
+  return new Card({
+    id: 'unbroken-choir',
+    name: 'Unbroken Choir',
+    cost: 2,
+    power: 0,
+    type: 'skill',
+    art: 'assets/cards/placeholder_card_25_unbroken_choir.svg',
+    effect: ({ self }) => self.heal(healAmount),
+  });
+}
+
+function createFaithbreakersGambit({ power = 4, selfCost = 2 } = {}) {
+  return new Card({
+    id: 'faithbreakers-gambit',
+    name: "Faithbreaker's Gambit",
+    cost: 0,
+    power,
+    type: 'attack',
+    art: 'assets/cards/placeholder_card_26_faithbreakers_gambit.svg',
+    effect: ({ self, enemy, card }) => {
+      enemy.takeDamage(card.power);
+      self.takeDamage(selfCost);
+    },
+  });
+}
+
+function createCinderWake({ power = 2, exileBonus = 4 } = {}) {
+  return new Card({
+    id: 'cinder-wake',
+    name: 'Cinder Wake',
+    cost: 2,
+    power,
+    type: 'attack',
+    art: 'assets/cards/placeholder_card_27_cinder_wake.svg',
+    effect: ({ enemy, deck, card }) => enemy.takeDamage(card.power + deck.exile.length * exileBonus),
+  });
+}
+
+function createHollowChant({ cleanseAmount = 2 } = {}) {
+  return new Card({
+    id: 'hollow-chant',
+    name: 'Hollow Chant',
+    cost: 1,
+    power: 0,
+    type: 'skill',
+    art: 'assets/cards/placeholder_card_28_hollow_chant.svg',
+    effect: ({ deck }) => {
+      const candidates = deck.allCards().filter((c) => c.wear > 0 && !c.corrupted);
+      if (candidates.length === 0) return;
+      const target = candidates[Math.floor(Math.random() * candidates.length)];
+      target.wear = Math.max(0, target.wear - cleanseAmount);
+    },
+  });
+}
+
+function createBoundInSilence({ power = 9 } = {}) {
+  return new Card({
+    id: 'bound-in-silence',
+    name: 'Bound in Silence',
+    cost: 2,
+    power,
+    type: 'attack',
+    art: 'assets/cards/placeholder_card_29_bound_in_silence.svg',
+    effect: ({ enemy, card }) => {
+      enemy.takeDamage(card.power);
+      card.applyWear(1);
+    },
+  });
+}
+
+function createTheLastEmber({ power = 8 } = {}) {
+  return new Card({
+    id: 'last-ember',
+    name: 'The Last Ember',
+    cost: 3,
+    power,
+    type: 'attack',
+    art: 'assets/cards/placeholder_card_30_the_last_ember.svg',
+    effect: ({ self, enemy, deck, card }) => {
+      enemy.takeDamage(card.power);
+      self.heal(deck.discardPile.length);
+    },
+  });
+}
+
+function createExpansionCards() {
+  return [
+    createWhisperingAsh(),
+    createGraveboundOath(),
+    createAshenWard(),
+    createPactOfEmbers(),
+    createUnbrokenChoir(),
+    createFaithbreakersGambit(),
+    createCinderWake(),
+    createHollowChant(),
+    createBoundInSilence(),
+    createTheLastEmber(),
+  ];
+}
+
+
 // ---- src/cards/starterCards.js (bundled, import/export stripped) ----
-// The 16 unique starter cards from the art manifest. Cards 16-18 and 20 in
-// the manifest are visual variants of an existing card rather than separate
-// mechanical cards -- see the design note at the bottom of this file for why.
+// The original 16 unique starter cards from the art manifest, plus (further
+// down this file) 4 cards repurposed from what used to be alt-art variants,
+// plus 10 more expansion cards in expansionCards.js -- ~30 unique mechanical
+// cards in total. See createStarterDeck() at the bottom for the full pool.
 
 function createSeveredVow({ power = 6 } = {}) {
   return new Card({
@@ -258,7 +419,6 @@ function createLastScreamOfTheGod({ power = 18, faithCost = 5 } = {}) {
     power,
     type: 'attack',
     art: 'assets/cards/card_03_last_scream_of_the_god.png',
-    corruptedArt: 'assets/cards/card_20_last_scream_of_the_god_variant.png',
     effect: ({ self, enemy, card }) => {
       self.takeDamage(faithCost);
       enemy.takeDamage(card.power);
@@ -419,7 +579,6 @@ function createTitanOfTheDeep({ power = 15 } = {}) {
     power,
     type: 'attack',
     art: 'assets/cards/card_14_titan_of_the_deep.png',
-    corruptedArt: 'assets/cards/card_18_titan_of_the_deep_variant.png',
     effect: ({ enemy, card }) => {
       enemy.takeDamage(card.power);
       card.corrupt();
@@ -435,7 +594,6 @@ function createRiteOfTheBleedingAltar({ power = 11, faithCost = 3 } = {}) {
     power,
     type: 'attack',
     art: 'assets/cards/card_15_rite_of_the_bleeding_altar.png',
-    corruptedArt: 'assets/cards/card_16_blood_communion_variant.png',
     effect: ({ self, enemy, card }) => {
       self.takeDamage(faithCost);
       enemy.takeDamage(card.power);
@@ -455,7 +613,89 @@ function createVacantThrone() {
   });
 }
 
-// Returns one copy of each of the 16 starter cards.
+// ---------------------------------------------------------------------
+// The 4 manifest "variant" art files (16-18, 20), now standalone cards.
+//
+// Earlier these were folded in as `corruptedArt` for Rite of the Bleeding
+// Altar (#15, x2), Titan of the Deep (#14), and Last Scream of the God (#3).
+// With the card pool expanding well past a 16-card toolkit, they're more
+// valuable as four fully independent cards with their own mechanics than as
+// alt-art for cards that already have plenty of identity; their old base
+// cards fall back to their normal (non-corrupted) art when corrupted, which
+// is fine since the purple corrupted-glow border on the card frame already
+// signals corruption on its own (see .hand-card.corrupted in index.html).
+// ---------------------------------------------------------------------
+
+function createBloodCommunion({ power = 6, healAmount = 3 } = {}) {
+  return new Card({
+    id: 'blood-communion',
+    name: 'Blood Communion',
+    cost: 2,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_16_blood_communion_variant.png',
+    effect: ({ self, enemy, card }) => {
+      enemy.takeDamage(card.power);
+      self.heal(healAmount);
+    },
+  });
+}
+
+function createBloodRite({ power = 5, burnBonus = 4 } = {}) {
+  return new Card({
+    id: 'blood-rite',
+    name: 'Blood Rite',
+    cost: 1,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_17_blood_rite_variant.png',
+    effect: ({ enemy, card }) => {
+      enemy.takeDamage(card.power + (enemy.burn > 0 ? burnBonus : 0));
+    },
+  });
+}
+
+function createTitansWake({ power = 12 } = {}) {
+  return new Card({
+    id: 'titans-wake',
+    name: "Titan's Wake",
+    cost: 3,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_18_titan_of_the_deep_variant.png',
+    effect: ({ enemy, deck, card }) => {
+      enemy.takeDamage(card.power);
+      const others = deck.hand.filter((c) => c !== card);
+      if (others.length > 0) {
+        const target = others[Math.floor(Math.random() * others.length)];
+        target.applyWear(1);
+      }
+    },
+  });
+}
+
+function createEchoOfTheGod({ power = 5 } = {}) {
+  return new Card({
+    id: 'echo-of-the-god',
+    name: 'Echo of the God',
+    cost: 1,
+    power,
+    type: 'attack',
+    art: 'assets/cards/card_20_last_scream_of_the_god_variant.png',
+    effect: ({ enemy, deck, card }) => {
+      enemy.takeDamage(card.power);
+      deck.draw(1);
+    },
+  });
+}
+
+// Returns one copy of every unique mechanical card in the game: the 16
+// original starter cards, the 4 cards above (repurposed from what used to
+// be alt-art variants), and the 10 further expansion cards in
+// expansionCards.js. Despite the name (kept for backward compatibility with
+// existing call sites), this is the *entire* card pool, not a subset --
+// there's no separate drafting/reward step, so every card in the game is in
+// play from turn one of every run.
 function createStarterDeck() {
   return [
     createSeveredVow(),
@@ -474,24 +714,13 @@ function createStarterDeck() {
     createTitanOfTheDeep(),
     createRiteOfTheBleedingAltar(),
     createVacantThrone(),
+    createBloodCommunion(),
+    createBloodRite(),
+    createTitansWake(),
+    createEchoOfTheGod(),
+    ...createExpansionCards(),
   ];
 }
-
-// Design note on the manifest's "variant" art files (16-18, 20):
-//
-// card_16_blood_communion_variant.png and card_17_blood_rite_variant.png
-// are alt art for Rite of the Bleeding Altar (#15); card_18 is alt art for
-// Titan of the Deep (#14); card_20 is alt art for Last Scream of the God
-// (#3). All four are wired as `corruptedArt` on their base card (shown once
-// the card corrupts) rather than as four additional playable cards. Keeping
-// them as separate cards would have produced near-duplicate effects with
-// different flavor art -- diluting the 20-slot pool without adding
-// mechanical depth. As alt/corrupted-state art they instead reinforce the
-// decay system that's already central to the game. 16 unique mechanical
-// cards is still a healthy starter-deck size, so this didn't leave the pool
-// short on variety. (card_17 "Blood Rite" is the second variant for #15;
-// since a card only has one `corruptedArt` slot, it's kept in the assets
-// folder as a second alt-art option for future use but isn't wired up yet.)
 
 
 // ---- src/game/Vessel.js (bundled, import/export stripped) ----
@@ -842,6 +1071,72 @@ const beckoningChorus = {
   },
 };
 
+// ---- Abilities offered by the 5 expansion enemies (src/game/enemies.js) ----
+
+const gildedWard = {
+  id: 'gilded-ward',
+  name: 'Gilded Ward',
+  description: "Permanently increases the card's raw power by 20%.",
+  apply: (card) => {
+    card.basePower = Math.round(card.basePower * 1.2);
+    if (!card.corrupted) card.power = card.basePower;
+  },
+};
+
+const sunderersEdge = {
+  id: 'sunderers-edge',
+  name: "Sunderer's Edge",
+  description: "Wraps the card's effect to also strip 3 shield from the enemy.",
+  apply: (card) => {
+    const originalEffect = card.effect;
+    card.effect = (ctx) => {
+      originalEffect(ctx);
+      if (ctx.enemy) ctx.enemy.shield = Math.max(0, ctx.enemy.shield - 3);
+    };
+  },
+};
+
+const famishedGrasp = {
+  id: 'famished-grasp',
+  name: 'Famished Grasp',
+  description: "Wraps the card's effect to also deal 1 bonus damage per corrupted card in your deck.",
+  apply: (card) => {
+    const originalEffect = card.effect;
+    card.effect = (ctx) => {
+      originalEffect(ctx);
+      const corruptedCount = ctx.deck ? ctx.deck.allCards().filter((c) => c.corrupted).length : 0;
+      if (corruptedCount > 0 && ctx.enemy) ctx.enemy.takeDamage(corruptedCount);
+    };
+  },
+};
+
+const verdictsMercy = {
+  id: 'verdicts-mercy',
+  name: "Verdict's Mercy",
+  description: "Wraps the card's effect to also heal 3 Faith when played below half Faith.",
+  apply: (card) => {
+    const originalEffect = card.effect;
+    card.effect = (ctx) => {
+      originalEffect(ctx);
+      if (ctx.self && ctx.self.faith <= ctx.self.maxFaith * 0.5) ctx.self.heal(3);
+    };
+  },
+};
+
+const unravelersMark = {
+  id: 'unravelers-mark',
+  name: "Unraveler's Mark",
+  description: 'Permanently adds 1 raw power and reduces cost by 1 (minimum 0).',
+  apply: (card) => {
+    card.basePower += 1;
+    card.baseCost = Math.max(0, card.baseCost - 1);
+    if (!card.corrupted) {
+      card.power = card.basePower;
+      card.cost = card.baseCost;
+    }
+  },
+};
+
 
 // ---- src/game/enemies.js (bundled, import/export stripped) ----
 // The five starter enemies, each with a distinct attack pattern. `rng` is
@@ -943,6 +1238,93 @@ class Beckoner extends Enemy {
   }
 }
 
+// ---------------------------------------------------------------------
+// 5 expansion enemies, filling the roster out to 10. None of these have
+// real generated art yet -- each uses a placeholder SVG (solid color +
+// name + "PLACEHOLDER ART" label) documented in ASSET_TODO.md.
+// ---------------------------------------------------------------------
+
+// Defensive brawler: shields itself before every strike, so raw damage
+// alone is less efficient against it than against a flat attacker.
+class GildedLiar extends Enemy {
+  constructor({ name = 'The Gilded Liar', maxFaith = 34, damage = 6, shieldPerTurn = 4, art, abilities = [] } = {}) {
+    super({ name, maxFaith, damage, art, abilities });
+    this.shieldPerTurn = shieldPerTurn;
+  }
+
+  takeTurn(target) {
+    this.addShield(this.shieldPerTurn);
+    target.takeDamage(this.damage);
+    return { type: 'guard-strike', amount: this.damage };
+  }
+}
+
+// Anti-defense specialist: strips the player's shield before hitting, so
+// stacking Long Vigil/Ashen Ward shields alone isn't a safe answer to it.
+class Sunderer extends Enemy {
+  constructor({ name = 'The Sunderer', maxFaith = 26, damage = 5, shieldStrip = 4, art, abilities = [] } = {}) {
+    super({ name, maxFaith, damage, art, abilities });
+    this.shieldStrip = shieldStrip;
+  }
+
+  takeTurn(target) {
+    const stripped = Math.min(target.shield, this.shieldStrip);
+    target.shield -= stripped;
+    target.takeDamage(this.damage);
+    return { type: 'sunder', amount: this.damage, shieldStripped: stripped };
+  }
+}
+
+// Predator: hits harder the lower the player's own Faith already is --
+// punishes a slow grind more than a quick, decisive fight.
+class Famine extends Enemy {
+  constructor({ name = 'The Famine', maxFaith = 28, damage = 4, maxBonus = 10, art, abilities = [] } = {}) {
+    super({ name, maxFaith, damage, art, abilities });
+    this.maxBonus = maxBonus;
+  }
+
+  takeTurn(target) {
+    const missingRatio = 1 - target.faith / target.maxFaith;
+    const bonus = Math.round(this.maxBonus * Math.max(0, missingRatio));
+    const amount = this.damage + bonus;
+    target.takeDamage(amount);
+    return { type: 'famish', amount };
+  }
+}
+
+// Sustain race: heals itself every turn in addition to attacking, so a
+// slow whittling-down strategy loses a war of attrition against it.
+class Verdict extends Enemy {
+  constructor({ name = 'The Verdict', maxFaith = 30, damage = 5, selfHeal = 3, art, abilities = [] } = {}) {
+    super({ name, maxFaith, damage, art, abilities });
+    this.selfHeal = selfHeal;
+  }
+
+  takeTurn(target) {
+    target.takeDamage(this.damage);
+    this.heal(this.selfHeal);
+    return { type: 'verdict', amount: this.damage, healed: this.selfHeal };
+  }
+}
+
+// Resource-attrition enemy: mills a card straight off the top of the
+// player's draw pile every turn, thinning their options over a long fight.
+class ChorusUnbound extends Enemy {
+  constructor({ name = 'The Chorus Unbound', maxFaith = 24, damage = 4, art, abilities = [] } = {}) {
+    super({ name, maxFaith, damage, art, abilities });
+  }
+
+  takeTurn(target, context = {}) {
+    target.takeDamage(this.damage);
+    let milled = null;
+    if (context.deck) {
+      milled = context.deck.millOne();
+      if (milled && context.log) context.log(`${this.name} unravels ${milled.name} from the draw pile.`);
+    }
+    return { type: 'unravel', amount: this.damage, milled: milled ? milled.id : null };
+  }
+}
+
 function createCrownedWound(overrides = {}) {
   return new CrownedWound({
     art: 'assets/enemies/enemy_01_the_crowned_wound.png',
@@ -983,12 +1365,57 @@ function createBeckoner(overrides = {}) {
   });
 }
 
+function createGildedLiar(overrides = {}) {
+  return new GildedLiar({
+    art: 'assets/enemies/placeholder_enemy_06_the_gilded_liar.svg',
+    abilities: [gildedWard],
+    ...overrides,
+  });
+}
+
+function createSunderer(overrides = {}) {
+  return new Sunderer({
+    art: 'assets/enemies/placeholder_enemy_07_the_sunderer.svg',
+    abilities: [sunderersEdge],
+    ...overrides,
+  });
+}
+
+function createFamine(overrides = {}) {
+  return new Famine({
+    art: 'assets/enemies/placeholder_enemy_08_the_famine.svg',
+    abilities: [famishedGrasp],
+    ...overrides,
+  });
+}
+
+function createVerdict(overrides = {}) {
+  return new Verdict({
+    art: 'assets/enemies/placeholder_enemy_09_the_verdict.svg',
+    abilities: [verdictsMercy],
+    ...overrides,
+  });
+}
+
+function createChorusUnbound(overrides = {}) {
+  return new ChorusUnbound({
+    art: 'assets/enemies/placeholder_enemy_10_the_chorus_unbound.svg',
+    abilities: [unravelersMark],
+    ...overrides,
+  });
+}
+
 const ENEMY_ROSTER = [
   createCrownedWound,
   createShriekingBrood,
   createHollowReliquary,
   createFracturedWidow,
   createBeckoner,
+  createGildedLiar,
+  createSunderer,
+  createFamine,
+  createVerdict,
+  createChorusUnbound,
 ];
 
 
@@ -1004,12 +1431,85 @@ function createDyingGod(overrides = {}) {
   });
 }
 
+// Mirrors' redemption: permanently makes a card wear 1 less per play
+// (minimum 0), thematically opposite of the corruption the Acolyte itself
+// suffers, and a direct counter-play to its own "corrupt a hand card" turn.
+const mirrorsRedemption = {
+  id: 'mirrors-redemption',
+  name: "Mirror's Redemption",
+  description: "Permanently reduces the card's wear gain by 1 per play (minimum 0).",
+  apply: (card) => {
+    const originalApplyWear = card.applyWear.bind(card);
+    card.applyWear = (amount = 1) => originalApplyWear(Math.max(0, amount - 1));
+  },
+};
+
+// A mid-run boss with a mechanic deliberately distinct from The Dying God's
+// Anchor/tether reform: no reform at all -- a normal Combat (not
+// BossCombat) is used for it. Instead, every turn it directly corrupts
+// (adds wear to) a random card anywhere in the player's deck, then heals
+// itself in proportion to how many of the player's cards are already
+// corrupted. That makes letting corruption pile up actively dangerous (it
+// fuels the boss's own sustain) without ever locking the fight behind a
+// single required Anchor use the way the final boss does.
+class BrokenAcolyte extends Enemy {
+  constructor({
+    name = 'The Broken Acolyte',
+    maxFaith = 40,
+    damage = 7,
+    wearInflicted = 1,
+    healPerCorrupted = 2,
+    art,
+    abilities = [],
+    rng = Math.random,
+  } = {}) {
+    super({ name, maxFaith, damage, art, abilities });
+    this.wearInflicted = wearInflicted;
+    this.healPerCorrupted = healPerCorrupted;
+    this.rng = rng;
+  }
+
+  takeTurn(target, context = {}) {
+    target.takeDamage(this.damage);
+
+    const pool = context.deck ? context.deck.allCards() : [];
+    let corrupted = null;
+    if (pool.length > 0) {
+      const card = pool[Math.floor(this.rng() * pool.length)];
+      card.applyWear(this.wearInflicted);
+      corrupted = card.id;
+      if (context.log) context.log(`${this.name} corrupts ${card.name}, mirroring its own ruin.`);
+    }
+
+    const corruptedCount = context.deck ? context.deck.allCards().filter((c) => c.corrupted).length : 0;
+    let healed = 0;
+    if (corruptedCount > 0) {
+      healed = corruptedCount * this.healPerCorrupted;
+      this.heal(healed);
+      if (context.log) {
+        context.log(`${this.name} draws strength from ${corruptedCount} corrupted memories, healing ${healed}.`);
+      }
+    }
+
+    return { type: 'ruinous-mirror', amount: this.damage, corrupted, healed };
+  }
+}
+
+function createBrokenAcolyte(overrides = {}) {
+  return new BrokenAcolyte({
+    art: 'assets/boss/placeholder_boss_02_the_broken_acolyte.svg',
+    abilities: [mirrorsRedemption],
+    ...overrides,
+  });
+}
+
 
 // ---- src/run/RunMap.js (bundled, import/export stripped) ----
 const NODE_TYPES = Object.freeze({
   FIGHT: 'fight',
   REST: 'rest',
   BOSS: 'boss',
+  MINIBOSS: 'miniboss',
 });
 
 // A branching, floor-by-floor node map. Every floor's nodes connect forward
@@ -1041,8 +1541,15 @@ class RunMap {
 // Generates a RunMap. `rng` is injectable for deterministic tests.
 // `enemyPool` (factory functions) is assigned randomly to fight nodes so
 // each node knows which enemy it holds; `bossFactory` is assigned to the
-// single boss node. Both are optional -- callers that don't pass them just
-// get a map without pre-assigned encounters.
+// single (final) boss node. Both are optional -- callers that don't pass
+// them just get a map without pre-assigned encounters.
+//
+// `miniBossFactory`, if given, marks exactly one node on a middle floor
+// (the first node of `miniBossFloor`, or the middle non-boss floor if
+// omitted) as a NODE_TYPES.MINIBOSS node instead of a normal roll, holding
+// that factory. Omitting `miniBossFactory` reproduces the exact map shape
+// (and RNG consumption) from before mini-bosses existed, so every existing
+// caller is unaffected.
 function generateRunMap({
   floorCount = 5,
   nodesPerFloor = 3,
@@ -1050,6 +1557,8 @@ function generateRunMap({
   rng = Math.random,
   enemyPool = [],
   bossFactory = null,
+  miniBossFactory = null,
+  miniBossFloor = null,
 } = {}) {
   if (floorCount < 2) {
     throw new Error('A run map needs at least 2 floors (one fight floor and a boss floor)');
@@ -1058,10 +1567,25 @@ function generateRunMap({
     throw new Error('Each non-boss floor needs at least one node');
   }
 
+  const nonBossFloorCount = floorCount - 1;
+  const resolvedMiniBossFloor = miniBossFactory
+    ? miniBossFloor ?? Math.floor(nonBossFloorCount / 2)
+    : null;
+
   const floors = [];
   for (let f = 0; f < floorCount - 1; f++) {
     const nodes = [];
     for (let i = 0; i < nodesPerFloor; i++) {
+      if (f === resolvedMiniBossFloor && i === 0) {
+        nodes.push({
+          id: `f${f}n${i}`,
+          floor: f,
+          type: NODE_TYPES.MINIBOSS,
+          connections: [],
+          enemyFactory: miniBossFactory,
+        });
+        continue;
+      }
       const type = rng() < restChance ? NODE_TYPES.REST : NODE_TYPES.FIGHT;
       const node = { id: `f${f}n${i}`, floor: f, type, connections: [] };
       if (type === NODE_TYPES.FIGHT && enemyPool.length > 0) {
@@ -1131,7 +1655,7 @@ class Run {
     if (!node) throw new Error(`Node ${nodeId} is not reachable from here`);
     this.currentNode = node;
     this.visited.push(node.id);
-    const background = node.type === NODE_TYPES.BOSS ? BACKGROUNDS.bossArena : BACKGROUNDS.nodeTransition;
+    const background = Run.backgroundForNode(node);
     this.log(`[Background: ${background}]`);
     this.log(`-- Entering ${node.type} node ${node.id} (floor ${node.floor}) --`);
     return node;
@@ -1157,6 +1681,20 @@ class Run {
     }
   }
 
+  // Background art for a given node, by node type/kind.
+  static backgroundForNode(node) {
+    switch (node.type) {
+      case NODE_TYPES.BOSS:
+        return BACKGROUNDS.bossArena;
+      case NODE_TYPES.MINIBOSS:
+        return BACKGROUNDS.miniBossArena;
+      case NODE_TYPES.REST:
+        return BACKGROUNDS.restSanctum;
+      default:
+        return BACKGROUNDS.nodeTransition;
+    }
+  }
+
   // Convenience for resolving a rest node: heals the player and completes it.
   restAtCurrentNode(amount) {
     if (!this.currentNode || this.currentNode.type !== NODE_TYPES.REST) {
@@ -1174,13 +1712,19 @@ class Run {
 
 
 // ---- src/run/backgrounds.js (bundled, import/export stripped) ----
-// Background art wired to the three points in a run where the screen
-// changes. Console-only for now -- Run logs these paths at the right
-// moments so a future renderer has somewhere to read them from.
+// Background art wired to the points in a run where the screen changes.
+// Run.enterNode() picks one of these per node type/kind so a future (or
+// the current web) renderer has somewhere to read them from.
 const BACKGROUNDS = Object.freeze({
   mapScreen: 'assets/backgrounds/bg_02_shard_network_nodemap.png',
   nodeTransition: 'assets/backgrounds/bg_01_the_fractured_descent_mapscreen.png',
   bossArena: 'assets/backgrounds/bg_03_the_bled_throne_bossfight.png',
+  // Placeholder art (see ASSET_TODO.md): a distinct background for rest
+  // nodes rather than reusing the regular-fight nodeTransition art, and a
+  // distinct arena for the mid-run mini-boss rather than reusing the final
+  // boss's arena.
+  restSanctum: 'assets/backgrounds/placeholder_bg_04_the_hollow_sanctum.svg',
+  miniBossArena: 'assets/backgrounds/placeholder_bg_05_the_acolytes_hollow.svg',
 });
 
 
