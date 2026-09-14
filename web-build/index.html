@@ -87,25 +87,39 @@
     padding-right: max(env(safe-area-inset-right), 8px);
   }
 
-  #topbar {
-    flex: 0 0 auto;
-    padding: 0 12px;
+  /* ---------- Title screen ----------
+     Branding lives here and on the end screen only -- gameplay screens
+     (map/combat/boss) get the full viewport with no persistent header. */
+  #title-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    position: relative;
-    z-index: 5;
+    padding: 14px 20px;
+    background: #000;
   }
 
-  #topbar h1 {
+  .brand-title {
     margin: 0;
-    font-size: 0.75rem;
-    letter-spacing: 0.1em;
+    font-size: 1.6rem;
+    letter-spacing: 0.12em;
     color: var(--gold);
     text-transform: uppercase;
-    text-shadow: 0 0 6px rgba(212,175,106,0.4);
+    text-shadow: 0 0 10px rgba(212,175,106,0.5);
   }
 
-  #topbar .subtitle {
-    display: none;
+  .brand-title.end-brand {
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+  }
+
+  .brand-subtitle {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-style: italic;
+    margin: 8px 0 22px;
   }
 
   #screen {
@@ -638,10 +652,6 @@
 </head>
 <body>
   <div id="app">
-    <div id="topbar">
-      <h1>Contract Breaker</h1>
-      <div class="subtitle" id="topbar-sub">a dying god's decaying memories</div>
-    </div>
     <div id="screen"></div>
   </div>
 

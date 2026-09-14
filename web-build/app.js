@@ -89,7 +89,6 @@ const G = {
 const screenEl = document.getElementById('screen');
 const modalOverlay = document.getElementById('modal-overlay');
 const modalEl = document.getElementById('modal');
-const topbarSub = document.getElementById('topbar-sub');
 
 function closeModal() {
   modalOverlay.classList.add('hidden');
@@ -103,6 +102,20 @@ function openModal(html) {
 modalOverlay.addEventListener('click', (e) => {
   if (e.target === modalOverlay) closeModal();
 });
+
+// ---------------------------------------------------------------------
+// Title screen
+// ---------------------------------------------------------------------
+function renderTitleScreen() {
+  screenEl.innerHTML = `
+    <div id="title-screen">
+      <h1 class="brand-title">Contract Breaker</h1>
+      <div class="brand-subtitle">a dying god's decaying memories</div>
+      <button class="action-btn primary" id="begin-btn" style="flex:0 0 auto;max-width:220px;padding:12px 20px">Begin the Descent</button>
+    </div>
+  `;
+  document.getElementById('begin-btn').addEventListener('click', newRun);
+}
 
 // ---------------------------------------------------------------------
 // Run setup
@@ -122,7 +135,6 @@ function newRun() {
   G.combat = null;
   G.lastShardText = null;
   G.lastTwistText = null;
-  topbarSub.textContent = "a dying god's decaying memories";
   renderMapScreen();
 }
 
@@ -628,6 +640,7 @@ function renderEndScreen() {
   const victory = G.run.result === 'victory';
   screenEl.innerHTML = `
     <div id="end-screen">
+      <h1 class="brand-title end-brand">Contract Breaker</h1>
       <div id="end-title" class="${victory ? 'victory' : 'defeat'}">${
         victory ? 'THE TETHER IS SEVERED' : 'YOUR FAITH IS BROKEN'
       }</div>
@@ -644,4 +657,4 @@ function renderEndScreen() {
 }
 
 // ---------------------------------------------------------------------
-newRun();
+renderTitleScreen();

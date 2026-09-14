@@ -9,6 +9,12 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- resizeableActivity, combined with targetSdkVersion 35 in
+             variables.gradle, tells the system this activity adapts to
+             whatever window it's given instead of needing its own
+             orientation/aspect-ratio compatibility treatment; this
+             replaces the previous PROPERTY_COMPAT_ALLOW_* opt-out
+             properties, which are no longer declared here. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -16,6 +22,7 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"
+            android:resizeableActivity="true"
             android:exported="true">
 
             <intent-filter>
@@ -35,36 +42,6 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- This app is deliberately locked to landscape (sensorLandscape)
-             and does not support resizing/portrait. Since Android 14/15/16,
-             the system otherwise applies its own orientation/aspect-ratio
-             "compatibility" treatment to such apps: letterboxing/
-             pillarboxing the window to some other aspect ratio, either by
-             default policy or via a user- or OEM-facing per-app "aspect
-             ratio" override (long present on some OEM skins, e.g. Samsung's
-             per-app screen size setting). None of that is visible in our
-             own manifest or CSS; it happens at the window-manager level,
-             above the WebView, before our page ever renders. These
-             properties opt this activity out of all of it, so the window
-             always gets the true full display regardless of its aspect
-             ratio, matching our own fullscreen/immersive setup exactly as
-             declared. Unrecognized on OS versions that predate a given
-             property; harmless no-ops there. -->
-        <property
-            android:name="android.window.PROPERTY_COMPAT_ALLOW_ORIENTATION_OVERRIDE"
-            android:value="false" />
-        <property
-            android:name="android.window.PROPERTY_COMPAT_ALLOW_DISPLAY_ORIENTATION_OVERRIDE"
-            android:value="false" />
-        <property
-            android:name="android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE"
-            android:value="false" />
-        <property
-            android:name="android.window.PROPERTY_COMPAT_ALLOW_USER_ASPECT_RATIO_OVERRIDE"
-            android:value="false" />
-        <property
-            android:name="android.window.PROPERTY_COMPAT_IGNORE_ORIENTATION_REQUEST"
-            android:value="false" />
     </application>
 
     <!-- Permissions -->

@@ -24,15 +24,16 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    // True immersive/sticky fullscreen: both the status bar and navigation
-    // bar are hidden and the WebView gets the entire screen. Bars can still
-    // be revealed temporarily with an edge swipe and auto-hide again
-    // (matches the behavior of the legacy SYSTEM_UI_FLAG_IMMERSIVE_STICKY).
+    // True immersive/sticky fullscreen via the modern edge-to-edge API:
+    // setDecorFitsSystemWindows(false) lets our content draw under the
+    // system bars, and hiding Type.systemBars() hides both the status bar
+    // and the navigation bar together. Bars can still be revealed
+    // temporarily with an edge swipe and auto-hide again.
     private void enableImmersiveMode() {
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         if (controller != null) {
-            controller.hide(WindowInsetsCompat.Type.systemBars());
+            controller.hide(WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars());
             controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         }
     }
